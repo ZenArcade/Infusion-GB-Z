@@ -57,10 +57,6 @@
 #endif
 //]mook_GB : add in audience
 
-#ifdef CONFIG_SND_VOODOO
-#include "wm8994_voodoo.h"
-#endif
-
 #if defined USE_INFINIEON_EC_FOR_VT
 #include "../s3c24xx/s3c-pcmdev.h"
 #endif
