@@ -34,7 +34,7 @@
 int exp_UV_mV[6];
 extern unsigned int freq_uv_table[6][3];
 int enabled_freqs[6] = { 0, 1, 1, 1, 1, 1 };
-extern unsigned int gpu[6][2]
+extern unsigned int gpu[6][2];
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
