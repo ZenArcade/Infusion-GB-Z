@@ -64,23 +64,13 @@ static struct cpufreq_frequency_table freq_table[] = {
 extern int exp_UV_mV[6];
 unsigned int freq_uv_table[6][3] = {
 	//frequency, stock voltage, current voltage
-	{1600000, 1350, 1350},
+	{1600000, 1400, 1400},
 	{1200000, 1275, 1275},
 	{800000, 1200, 1250},
 	{400000, 1050, 1050},
 	{200000, 950, 950},
 	{100000, 950, 950}
 }; 
-
-unsigned int gpu[6][2] = {
-	//stock  current
-	{200, 200},
-	{200, 200},
-	{200, 200},
-	{200, 200},
-	{200, 200},
-	{100, 100}
-};
 
 struct s5pv210_dvs_conf {
 	unsigned long       arm_volt;   /* uV */
@@ -94,12 +84,12 @@ static unsigned int g_dvfslockval[DVFS_LOCK_TOKEN_NUM];
 //static DEFINE_MUTEX(dvfs_high_lock);
 #endif
 
-const unsigned long arm_volt_max = 1350000;
+const unsigned long arm_volt_max = 1400000;
 const unsigned long int_volt_max = 1250000;
 
 static struct s5pv210_dvs_conf dvs_conf_asv0[] = {
 	[L0] = {
-		.arm_volt   = 1350000,
+		.arm_volt   = 1400000,
 		.int_volt   = 1125000,
 	},
 	[L1] = {
@@ -126,7 +116,7 @@ static struct s5pv210_dvs_conf dvs_conf_asv0[] = {
 
 static struct s5pv210_dvs_conf dvs_conf_asv1[] = {
 	[L0] = {
-		.arm_volt   = 1350000,
+		.arm_volt   = 1400000,
 		.int_volt   = 1125000,
 	},
 	[L1] = {
@@ -153,7 +143,7 @@ static struct s5pv210_dvs_conf dvs_conf_asv1[] = {
 
 static struct s5pv210_dvs_conf dvs_conf_asv2[] = {
 	[L0] = {
-		.arm_volt   = 1350000,
+		.arm_volt   = 1400000,
 		.int_volt   = 1125000,
 	},
 	[L1] = {
@@ -575,34 +565,6 @@ static int s5pv210_cpufreq_target(struct cpufreq_policy *policy,
 		}
 	}
 	cpufreq_notify_transition(&s3c_freqs.freqs, CPUFREQ_PRECHANGE);
-
-	/* Yeah, this is hacky as fuck. So what? */
-	
-	switch(s3c_freqs.old.armclk) {
-		case 1600000:
-			s3c_freqs.old.hclk_msys = gpu[0][1];
- 			break;
-		case 1200000:
-			s3c_freqs.old.hclk_msys = gpu[1][1];
-			break;
-		case 800000:
-			s3c_freqs.old.hclk_msys = gpu[2][1];
-			break;
-		case 400000:
-			s3c_freqs.old.hclk_msys = gpu[3][1];
-			break;
-		case 200000:
-			s3c_freqs.old.hclk_msys = gpu[4][1];
-			break;
-		case 100000:
-			s3c_freqs.old.hclk_msys = gpu[5][1];
-			break;
-	}
-		/* Convert to khz */  
-	
-	s3c_freqs.old.hclk_msys *= 1000;
-	s3c_freqs.new.hclk_msys = gpu[index][1]*1000;
-
 
 	if (s3c_freqs.new.fclk != s3c_freqs.old.fclk || first_run)
 		pll_changing = 1;
