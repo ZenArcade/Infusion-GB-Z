@@ -474,5 +474,4 @@ config LEVEL
 	help
 	  Say Y to enable debug level I/F support.
 
-
 endif # MISC_DEVICES
