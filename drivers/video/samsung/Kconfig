@@ -169,7 +169,7 @@ config VIBRANTPLUSTELUS_BOOT_LOGO
           This flag is to support boot logo for Telus
 
 config FROYO_BOOTLOADER
-	bool "Using Froyo bootlaoders"
+	bool "Using Froyo bootloaders"
 	default n
 	---help---
 	  Choose whether you are using froyo bootloaders
