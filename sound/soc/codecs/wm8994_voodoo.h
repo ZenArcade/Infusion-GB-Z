@@ -13,7 +13,8 @@
 	|| defined (CONFIG_SAMSUNG_CAPTIVATE)				       \
 	|| defined (CONFIG_SAMSUNG_VIBRANT)				       \
 	|| defined (CONFIG_SAMSUNG_FASCINATE)				       \
-	|| defined (CONFIG_SAMSUNG_EPIC)
+	|| defined (CONFIG_SAMSUNG_EPIC)                                       \
+	|| defined (CONFIG_S5PC110_DEMPSEY_BOARD)
 #define NEXUS_S
 #endif
 
