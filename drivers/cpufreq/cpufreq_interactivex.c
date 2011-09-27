@@ -60,7 +60,7 @@ static unsigned int enabled = 0;
 static unsigned long min_sample_time;
 
 #define FREQ_THRESHOLD 1200000;
-#define RESUME_SPEED 1200000;
+#define RESUME_SPEED 1600000;
 
 static int cpufreq_governor_interactivex(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -182,8 +182,8 @@ static unsigned int cpufreq_interactivex_calc_freq(unsigned int cpu)
 
 	cpu_load = 100 * (delta_time - idle_time) / delta_time;
 
-	if (cpu_load > 98) newfreq = policy->max;
-	else newfreq = policy->cur * cpu_load / 100;	
+	if (cpu_load > 25) newfreq = policy->max;
+	else newfreq = policy->cur * cpu_load / 100;
 
 	return newfreq;
 }
