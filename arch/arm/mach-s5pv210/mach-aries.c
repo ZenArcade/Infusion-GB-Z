@@ -4694,7 +4694,7 @@ static struct s3c_platform_camera sr130pc10 = {
 	.fmt		= ITU_601_YCBCR422_8BIT,
 	.order422	= CAM_ORDER422_8BIT_YCBYCR,
 #ifdef CONFIG_S5PC110_DEMPSEY_BOARD //NAGSM_Android_HQ_Camera_SungkooLee_20101022
-	.i2c_busnum	= 16, //NAGSM_Android_HQ_Camera_SoojinKim_20110603 (17)
+	.i2c_busnum	= 17, //NAGSM_Android_HQ_Camera_SoojinKim_20110603
 #else
 	.i2c_busnum	= 0,
 #endif
