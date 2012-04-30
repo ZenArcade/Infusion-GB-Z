@@ -1,6 +1,8 @@
 HOW TO BUILD KERNEL 2.6.35 FOR SGH-I997R
 
-1. Visit http://www.codesourcery.com/, download and install Sourcery G++ Lite 2009q3-68 toolchain for ARM EABI.
+1. Download and install Sourcery G++ Lite 2009q3-68 toolchain for ARM EABI, available here:
+
+     https://sourcery.mentor.com/sgpp/lite/arm/portal/release1033
 
 2. Extract kernel source and move into the top directory.
 

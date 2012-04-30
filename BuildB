@@ -1,9 +1,9 @@
 #!/bin/sh
-export KBUILD_BUILD_VERSION="Infusion-GB-CoreB"
+export KBUILD_BUILD_VERSION="Infusion-GB-Z-CoreB"
 cp -rf ./Core-B/* ./
 mkdir -p kernel/usr/initramfs
 rm -rf kernel/usr/initramfs/*
-cp -R ../initramfs_sgh-i997r/* kernel/usr/initramfs
+cp -R ../initramfs_sgh-i997r-z/* kernel/usr/initramfs
 rm $(find kernel/usr/initramfs -name EMPTY_DIRECTORY -print)
 rm -rf $(find kernel/usr/initramfs -name .git -print)
 make dempseyR_rev00_defconfig
