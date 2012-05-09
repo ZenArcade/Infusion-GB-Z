@@ -7,7 +7,7 @@ cp -R ../initramfs_sgh-i997r-z/* kernel/usr/initramfs
 rm $(find kernel/usr/initramfs -name EMPTY_DIRECTORY -print)
 rm -rf $(find kernel/usr/initramfs -name .git -print)
 make dempseyR_rev00_defconfig
-make -j32 && cp -a $(find . -name *.ko -print |grep -v initramfs) kernel/usr/initramfs/lib/modules/ && make -j32
+make -j16 && cp -a $(find . -name *.ko -print |grep -v initramfs) kernel/usr/initramfs/lib/modules/ && make -j16
 rm ./arch/arm/mach-s5pv210/cpu-freq_c110b.c
 rm ./arch/arm/mach-s5pv210/include/mach/cpu-freq-v210.h
 rm ./drivers/usb/gadget/s3c_udc_otg.c
