@@ -1,5 +1,5 @@
 #!/bin/sh
-export KBUILD_BUILD_VERSION="Infusion-GB-Z-CoreB"
+export KBUILD_BUILD_VERSION="Infusion-GB-Zen-CoreB-14"
 cp -rf ./Core-B/* ./
 mkdir -p kernel/usr/initramfs
 rm -rf kernel/usr/initramfs/*
