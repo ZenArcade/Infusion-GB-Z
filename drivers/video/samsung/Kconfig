@@ -108,7 +108,7 @@ config FB_S3C_uPD161224
         select SPI_BITBANG
         ---help---
           This enables support for TMD NEC uPD161224 WVGA LCD panel
-          
+
 config FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
 	depends on FB_S3C_MDNIE && S5PC110_DEMPSEY_BOARD
 	bool "mDNIe tuning mode for backlights"

@@ -699,6 +699,10 @@ wl_iw_set_country(
     wl_country_t cspec = {{0},0,{0}};
     int size = 0;
     int i = 0;
+    while ((i++ < 6) && (g_first_broadcast_scan < BROADCAST_SCAN_FIRST_RESULT_CONSUMED)) {
+        msleep(500);
+    }
+    i=0;
     size = ARRAYSIZE(country_rev_map);
     memset(country_code, 0, sizeof(country_code));
 

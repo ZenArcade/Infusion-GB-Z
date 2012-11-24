@@ -87,6 +87,8 @@ static void sdhci_dumpregs(struct sdhci_host *host)
 	printk(KERN_DEBUG DRIVER_NAME ": Caps:     0x%08x | Max curr: 0x%08x\n",
 		sdhci_readl(host, SDHCI_CAPABILITIES),
 		sdhci_readl(host, SDHCI_MAX_CURRENT));
+	printk(KERN_DEBUG DRIVER_NAME ": CMDs:     0x%08x\n",
+		sdhci_readw(host, SDHCI_COMMAND));
 
 	if (host->flags & SDHCI_USE_ADMA)
 		printk(KERN_DEBUG DRIVER_NAME ": ADMA Err: 0x%08x | ADMA Ptr: 0x%08x\n",
@@ -1520,6 +1522,7 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 		host->cmd->error = -EILSEQ;
 
 	if (host->cmd->error) {
+		printk(KERN_DEBUG "%s(%d) intmask = 0x%x.\n", __func__, __LINE__, intmask);
 		tasklet_schedule(&host->finish_tasklet);
 		host->cmd = NULL;
 		return;
@@ -1656,6 +1659,14 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 
 	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
 
+	if (intmask & SDHCI_INT_ERROR)
+	{
+		DBG("%s:%s: cmd%d, arg = 0x%X, ERRSTS = 0x%X\n",
+				mmc_hostname(host->mmc), __func__,
+				host->cmd->opcode, host->cmd->arg,
+				sdhci_readw(host, SDHCI_INT_ERRSTS));
+	}
+
 	if (!intmask || intmask == 0xffffffff) {
 		result = IRQ_NONE;
 		goto out;
@@ -1771,7 +1782,7 @@ int sdhci_resume_host(struct sdhci_host *host)
 	int ret = 0;
 	struct mmc_host *mmc = host->mmc;
 
-#if ! defined (CONFIG_S5PC110_HAWK_BOARD)
+#if ! defined (CONFIG_S5PC110_HAWK_BOARD) 
 	/* 20110125 - power on moviNAND in case of 27nm moviNAND */
 	if(mmc->card && (mmc->card->type==MMC_TYPE_MMC)) {
 		gpio_set_value(GPIO_MASSMEMORY_EN, 1);	
@@ -2063,12 +2074,16 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (ret)
 		goto untasklet;
 
+	if (mmc->index == 1) {
 	host->vmmc = regulator_get(mmc_dev(mmc), "vtf");
 	if (IS_ERR(host->vmmc)) {
 		printk(KERN_INFO "%s: no vmmc regulator found\n", mmc_hostname(mmc));
 		host->vmmc = NULL;
 	} else {
+			regulator_force_disable(host->vmmc);
+			mdelay(30);
 		regulator_enable(host->vmmc);
+	}
 	}
 
 	sdhci_init(host, 0);

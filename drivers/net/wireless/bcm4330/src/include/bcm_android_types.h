@@ -1,9 +1,7 @@
 /*
- * Android related remote wl declarations
- *
- * Copyright (C) 1999-2011, Broadcom Corporation
+ * Copyright (C) 1999-2010, Broadcom Corporation
  * 
- *         Unless you and Broadcom execute a separate written software license
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
@@ -20,10 +18,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- *
- * $Id: bcm_android_types.h,v 13.1 2009/08/07 06:58:34 Exp $
- *
- */
+*/
 #ifndef _wlu_android_h
 #define _wlu_android_h
 #define  __fd_mask unsigned long

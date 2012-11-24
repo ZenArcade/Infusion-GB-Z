@@ -22,7 +22,8 @@
  */
 
 #define GINTMSK_INIT	(INT_OUT_EP|INT_IN_EP|INT_RESUME|INT_ENUMDONE|INT_RESET|INT_SUSPEND)
-#define DOEPMSK_INIT	(CTRL_OUT_EP_SETUP_PHASE_DONE|AHB_ERROR|TRANSFER_DONE)
+#define DOEPMSK_INIT	(CTRL_OUT_EP_SETUP_PHASE_DONE | AHB_ERROR | BACK2BACK_SETUP_RECEIVED |\
+				TRANSFER_DONE)
 #define DIEPMSK_INIT	(NON_ISO_IN_EP_TIMEOUT|AHB_ERROR|TRANSFER_DONE)
 #define GAHBCFG_INIT	(PTXFE_HALF|NPTXFE_HALF|MODE_DMA|BURST_INCR4|GBL_INT_UNMASK)
 
@@ -85,7 +86,7 @@ static inline void s3c_udc_pre_setup(void)
 
 	DEBUG_IN_EP("%s : Prepare Setup packets.\n", __func__);
 
-	writel((1 << 19)|sizeof(struct usb_ctrlrequest), S3C_UDC_OTG_DOEPTSIZ(EP0_CON));
+	writel((3<<29)| (1<<19) | sizeof(struct usb_ctrlrequest), S3C_UDC_OTG_DOEPTSIZ(EP0_CON));
 	writel(virt_to_phys(&usb_ctrl), S3C_UDC_OTG_DOEPDMA(EP0_CON));
 
 	ep_ctrl = readl(S3C_UDC_OTG_DOEPCTL(EP0_CON));
@@ -286,6 +287,13 @@ static void complete_tx(struct s3c_udc *dev, u8 ep_num)
 		is_short, ep_tsr, xfer_size);
 
 	if (req->req.actual == req->req.length) {
+               /* send ZLP when req.zero is set for Non-ep0 */
+               if (ep_num > 0 && req->req.zero) {
+                       req->req.zero = 0;
+                       write_fifo_ep0(ep, req);
+                       return;
+               }
+
 		done(ep, req, 0);
 
 		if (!list_empty(&ep->queue)) {
@@ -380,8 +388,20 @@ static void process_ep_out_intr(struct s3c_udc *dev)
 			writel(ep_intr_status, S3C_UDC_OTG_DOEPINT(ep_num));
 
 			if (ep_num == 0) {
-				if (ep_intr_status & CTRL_OUT_EP_SETUP_PHASE_DONE) {
-					DEBUG_OUT_EP("\tSETUP packet(transaction) arrived\n");
+				if (ep_intr_status &
+					CTRL_OUT_EP_SETUP_PHASE_DONE) {
+					DEBUG_OUT_EP("\tSETUP"
+						"packet(transaction)"
+						"arrived\n");
+					if (likely((ep_intr_status & BACK2BACK_SETUP_RECEIVED)==0)) {
+						if(((__raw_readl(S3C_UDC_OTG_DOEPTSIZ(0))>>29)&0x3) < 2) {
+							/* Got more than 1 setup packets */
+							/* Get the last valid setup packet (next setup pkt)*/
+							s3c_udc_pre_setup();
+							printk(KERN_DEBUG "b2bs\n");
+							continue;
+						}
+					}
 					s3c_handle_ep0(dev);
 				}
 
@@ -507,15 +527,8 @@ static irqreturn_t s3c_udc_irq(int irq, void *_dev)
 				reset_available = 0;
 				s3c_udc_pre_setup();
 			}
-		} else if (!(usb_status & B_SESSION_VALID)) {
-			reset_available = 1;
-			if (dev->udc_enabled) {
-				DEBUG_ISR("Reset without B_SESSION\n");
-				if (dev->driver) {
-					spin_unlock(&dev->lock);
-					dev->driver->disconnect(&dev->gadget);
-					spin_lock(&dev->lock);
-				}
+                        else {
+                            reset_available = 1;
 			}
 		} else {
 			reset_available = 1;
@@ -1147,7 +1160,7 @@ static int s3c_udc_set_feature(struct usb_ep *_ep)
 	DEBUG_SETUP("%s: *** USB_REQ_SET_FEATURE , ep_num = %d\n", __func__, ep_num);
 
 	if (usb_ctrl.wLength != 0) {
-		DEBUG_SETUP("\tSET_FEATURE: wLength is not zero.....\n");
+		//DEBUG_SETUP("\tSET_FEATURE: wLength is not zero.....\n");
 		return 1;
 	}
 
@@ -1156,27 +1169,27 @@ static int s3c_udc_set_feature(struct usb_ep *_ep)
 		switch (usb_ctrl.wValue) {
 		case USB_DEVICE_REMOTE_WAKEUP:
 			DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_REMOTE_WAKEUP\n");
-			printk(KERN_INFO "%s:: USB_DEVICE_REMOTE_WAKEUP\n", __func__);
+			//printk(KERN_INFO "%s:: USB_DEVICE_REMOTE_WAKEUP\n", __func__);
 			dev->status |= (1 << USB_DEVICE_REMOTE_WAKEUP);
 			break;
 
 		case USB_DEVICE_TEST_MODE:
-			DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_TEST_MODE\n");
+			//DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_TEST_MODE\n");
 			set_test_mode();
 			break;
 
 		case USB_DEVICE_B_HNP_ENABLE:
-			DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_B_HNP_ENABLE\n");
+			//DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_B_HNP_ENABLE\n");
 			break;
 
 		case USB_DEVICE_A_HNP_SUPPORT:
 			/* RH port supports HNP */
-			DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_A_HNP_SUPPORT\n");
+			//DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_A_HNP_SUPPORT\n");
 			break;
 
 		case USB_DEVICE_A_ALT_HNP_SUPPORT:
 			/* other RH port does */
-			DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_A_ALT_HNP_SUPPORT\n");
+			//DEBUG_SETUP("\tSET_FEATURE: USB_DEVICE_A_ALT_HNP_SUPPORT\n");
 			break;
 		}
 

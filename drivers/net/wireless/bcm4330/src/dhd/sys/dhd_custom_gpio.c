@@ -174,7 +174,7 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 			WL_TRACE(("%s: call customer specific GPIO to insert WLAN RESET\n",
 				__FUNCTION__));
 
-			//wifi_set_power(0, 0);
+			wifi_set_power(0, 0);
 
 			WL_ERROR(("=========== WLAN placed in RESET ========\n"));
 		break;
@@ -183,7 +183,7 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 			WL_TRACE(("%s: callc customer specific GPIO to remove WLAN RESET\n",
 				__FUNCTION__));
 
-			//wifi_set_power(1, 0);
+			wifi_set_power(1, 0);
 
 			WL_ERROR(("=========== WLAN going back to live  ========\n"));
 		break;
@@ -191,11 +191,19 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 		case WLAN_POWER_OFF:
 			WL_TRACE(("%s: call customer specific GPIO to turn off WL_REG_ON\n",
 				__FUNCTION__));
+
+		//	wifi_set_power(0, 0);
+							
+			WL_ERROR(("=========== WLAN placed in POWER OFF ========\n"));				
 		break;
 
 		case WLAN_POWER_ON:
 			WL_TRACE(("%s: call customer specific GPIO to turn on WL_REG_ON\n",
 				__FUNCTION__));
+				
+		//	wifi_set_power(1, 0);				
+				
+			WL_ERROR(("=========== WLAN going back to POWER ON ========\n"));				
 		break;
 	}
 }

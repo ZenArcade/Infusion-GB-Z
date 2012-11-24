@@ -1474,7 +1474,7 @@ static int ce147_set_preview_size(struct v4l2_subdev *sd)
 	if (index == CE147_PREVIEW_720P) {
 		ce147_regbuf_hd_preview[0] = 0x01;
 		state->hd_preview_on = 1;
-		pr_info("%s: preview_size is HD (%d)\n",
+		ce147_msg(&client->dev, "%s: preview_size is HD (%d)\n",
 				__func__, state->hd_preview_on);
 		err = ce147_i2c_write_multi(client, CMD_HD_PREVIEW,
 				ce147_regbuf_hd_preview,
@@ -1483,7 +1483,7 @@ static int ce147_set_preview_size(struct v4l2_subdev *sd)
 			return -EIO;
 	} else {
 		state->hd_preview_on = 0;
-		pr_info("%s: preview_size is not HD (%d)\n",
+		ce147_msg(&client->dev, "%s: preview_size is not HD (%d)\n",
 				__func__, state->hd_preview_on);
 		err = ce147_i2c_write_multi(client, CMD_HD_PREVIEW,
 				ce147_regbuf_hd_preview,
@@ -1496,8 +1496,8 @@ static int ce147_set_preview_size(struct v4l2_subdev *sd)
 	err = ce147_i2c_write_multi(client, CMD_PREVIEW_SIZE,
 			ce147_regbuf_preview_size, ce147_reglen_preview_size);
 	if (err < 0) {
-		pr_info("%s: preview_size is not HD (%d)\n",
-				__func__, state->hd_preview_on);
+		dev_err(&client->dev, "%s: failed: i2c_write "
+				"for set_preview_size\n", __func__);
 		return -EIO;
 	}
 
@@ -2098,8 +2098,13 @@ static int ce147_set_capture_exif(struct v4l2_subdev *sd)
 #endif //CONFIG_S5PC110_KEPLER_BOARD
 
 #if defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD)
+#if defined(CONFIG_VIDEO_VIBRANTPLUSTELUS)
+	unsigned char ce147_str_model[10] = "SGH-T959P\0";
+#else
 	unsigned char ce147_str_model[10] = "SGH-T959V\0";
 #endif
+#endif
+
 #if 0
 	struct timeval curr_time;
 	struct rtc_time time;

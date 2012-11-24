@@ -28,7 +28,7 @@ EXTRA_CFLAGS += -DOOB_INTR_ONLY
 
 # For SOFTAP
 EXTRA_CFLAGS += -DSOFTAP
-# EXTRA_CFLAGS += -DUSE_HIDDEN_SSID
+EXTRA_CFLAGS += -DUSE_HIDDEN_SSID
 
 # For Debug
 EXTRA_CFLAGS += -DDHD_DEBUG -DSRCBASE=\"$(src)/src\"
@@ -46,7 +46,7 @@ EXTRA_CFLAGS += -DDHD_USE_STATIC_BUF
 #EXTRA_CFLAGS += -DWLP2P
 
 # BTAMP
-EXTRA_CFLAGS += -DWLBTAMP
+#EXTRA_CFLAGS += -DWLBTAMP
 
 # COMBO SCAN
 EXTRA_CFLAGS += -DCSCAN
@@ -64,16 +64,21 @@ EXTRA_CFLAGS += -DPKT_FILTER_SUPPORT
 #EXTRA_CFLAGS += -DARP_OFFLOAD_SUPPORT
 
 # Hidden SSID
-# EXTRA_CFLAGS += -DUSE_HIDDEN_SSID 
+EXTRA_CFLAGS += -DUSE_HIDDEN_SSID 
 
 # For CID check
 EXTRA_CFLAGS += -DUSE_CID_CHECK
 
 # 2.4G only scan for the initial broad scan
-#EXTRA_CFLAGS += -DUSE_INITIAL_2G_SCAN
+EXTRA_CFLAGS += -DUSE_INITIAL_2G_SCAN
 
 #Change PM mode dynamically
 EXTRA_CFLAGS += -DCONFIG_CONTROL_PM
+
+#MobileAP fw_reload
+EXTRA_CFLAGS += -DMOBILEAP_RELOAD
+#Support CCX
+EXTRA_CFLAGS += -DBCMCCX
 
 ###############################################################################################
 
@@ -99,7 +104,6 @@ dhd-y := src/dhd/sys/dhd_linux.o \
          src/dhd/sys/dhd_sdio.o \
          src/dhd/sys/dhd_custom_gpio.o \
          src/dhd/sys/dhd_custom_sec.o \
-         src/dhd/sys/dhd_bta.o \
          src/shared/aiutils.o \
          src/shared/bcmutils.o \
          src/shared/bcmwifi.o \
@@ -128,7 +132,6 @@ clean:
          src/dhd/sys/dhd_sdio.o \
          src/dhd/sys/dhd_custom_gpio.o \
          src/dhd/sys/dhd_custom_sec.o \
-         src/dhd/sys/dhd_bta.o \
          src/shared/aiutils.o \
          src/shared/bcmutils.o \
          src/shared/bcmwifi.o \
@@ -149,7 +152,6 @@ clean:
          src/dhd/sys/.dhd_sdio.o.cmd \
          src/dhd/sys/.dhd_custom_gpio.o.cmd \
          src/dhd/sys/.dhd_custom_sec.o.cmd \
-         src/dhd/sys/.dhd_bta.o.cmd \
          src/shared/.aiutils.o.cmd \
          src/shared/.bcmutils.o.cmd \
          src/shared/.bcmwifi.o.cmd \

@@ -19,6 +19,8 @@
 #define MXT224_DEV_NAME "Atmel MXT224"
 
 #define MXT224_THRESHOLD		40
+#define MXT224E_THRESHOLD		50
+
 #define MXT224_MAX_MT_FINGERS	10
 
 
@@ -138,6 +140,7 @@ struct mxt224_platform_data {
 	int max_finger_touches;
 	const u8 **config;
 	const u8 **config_e;	
+	const u8 *t48_ta_cfg;
 	int gpio_read_done;
 	int min_x;
 	int max_x;
@@ -152,6 +155,24 @@ struct mxt224_platform_data {
 	void (*register_cb)(void*);
 	void (*read_ta_status)(void*);	
 };
+
+typedef struct
+{
+	bool fherr_setting;
+	uint8_t fherr_count;
+	uint8_t t9_blen_for_fherr;
+	uint8_t t9_thr_for_fherr;
+	uint8_t t9_blen_for_fherr_cnt;
+	uint8_t t9_movfilter_for_fherr;
+	uint8_t t22_noisethr_for_fherr;
+	uint8_t t28_cte_for_fherr;
+	uint8_t freq_for_fherr1[5];
+	uint8_t freq_for_fherr2[5];
+	uint8_t freq_for_fherr3[5];
+	uint8_t freq_for_fherr4[5];
+
+}__packed t22_freq_table_config_t;
+
 
 typedef enum
 {

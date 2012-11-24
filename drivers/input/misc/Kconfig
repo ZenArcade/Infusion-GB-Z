@@ -472,7 +472,7 @@ config OPTICAL_TAOS_TRITON
 	default n
 	help
 	  This option enables proximity & light sensors using taos driver.
-
+	  
 config OPTICAL_CAPELLA_TRITON
 	depends on  I2C && S5PC110_DEMPSEY_BOARD
 	tristate "CAPELLA triton driver for s5pc110"

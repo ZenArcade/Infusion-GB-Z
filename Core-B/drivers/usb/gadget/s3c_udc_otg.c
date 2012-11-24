@@ -103,7 +103,8 @@ static char *state_names[] = {
 
 #define	DRIVER_DESC		"S3C HS USB Device Controller Driver, (c) 2008-2009 Samsung Electronics"
 #define	DRIVER_VERSION		"15 March 2009"
-
+extern void s5pv210_lock_dvfs_high_level(uint , uint);
+extern void s5pv210_unlock_dvfs_high_level(unsigned int);
 struct s3c_udc	*the_controller;
 
 static struct clk	*otg_clock;
@@ -435,7 +436,19 @@ int s3c_vbus_enable(struct usb_gadget *gadget, int enable)
 	unsigned long flags;
 	struct s3c_udc *dev = the_controller;
 
+#ifdef CONFIG_S5PC110_KEPLER_BOARD
  // USB Gadget entry point
+ if (enable) {
+  dev_info(&gadget->dev, "USB udc %d,%d lock\n", dev->udc_enabled, enable);
+  //wake_lock(&dev->udc_wake_lock);
+  //s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_8, L1); //200Mhz lock
+  	s5pv210_lock_dvfs_high_level(DVFS_LOCK_TOKEN_8,L1); //800MHz lock
+ } else {
+  dev_info(&gadget->dev, "USB udc %d,%d unlock\n", dev->udc_enabled, enable);
+  //wake_unlock(&dev->udc_wake_lock);
+  s5pv210_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_8);
+ }
+#else
  if (enable) {
   dev_info(&gadget->dev, "USB udc %d,%d lock\n", dev->udc_enabled, enable);
   //wake_lock(&dev->udc_wake_lock);
@@ -445,6 +458,7 @@ int s3c_vbus_enable(struct usb_gadget *gadget, int enable)
   //wake_unlock(&dev->udc_wake_lock);
   s5pv210_unlock_dvfs_high_level(DVFS_LOCK_TOKEN_8);
  }
+#endif
 
 	if (dev->udc_enabled != enable) {
 		dev->udc_enabled = enable;

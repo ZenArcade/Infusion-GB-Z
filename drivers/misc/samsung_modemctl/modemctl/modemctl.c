@@ -349,9 +349,9 @@ static void m5720_off(struct modemctl *mc)
 
 	if(mc->gpio_phone_on)
 		gpio_set_value(mc->gpio_phone_on, 0);
-	
+
 	if(mc->gpio_cp_reset)
-		gpio_direction_output(mc->gpio_cp_reset, GPIO_LEVEL_LOW);	
+		gpio_direction_output(mc->gpio_cp_reset, GPIO_LEVEL_LOW);
 	
 	if((gpio_get_value(GPIO_INT_RESOUT) == 0) && (gpio_get_value(GPIO_CP_PWR_RST) == 0))
 	{		

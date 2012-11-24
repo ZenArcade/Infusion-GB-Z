@@ -219,12 +219,10 @@ static int k3dh_open(struct inode *inode, struct file *file)
 
 	if (atomic_read(&k3dh->opened) == 0) {
 		file->private_data = k3dh;
-		#if 0 // not support calibration
 		err = k3dh_open_calibration(k3dh);
 		if (err < 0)
 			pr_err("%s: k3dh_open_calibration() failed\n",
 				__func__);
-		#endif
 		k3dh->ctrl_reg1_shadow = DEFAULT_POWER_ON_SETTING;
 		err = i2c_smbus_write_byte_data(k3dh->client, CTRL_REG1,
 						DEFAULT_POWER_ON_SETTING);

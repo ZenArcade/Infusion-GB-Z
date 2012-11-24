@@ -1140,7 +1140,7 @@ void mmc_rescan(struct work_struct *work)
 	spin_unlock_irqrestore(&host->lock, flags);
 
 //[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
-	mutex_lock(&host->carddetect_lock); 
+//	mutex_lock(&host->carddetect_lock); 
 //]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion	
 
 	mmc_bus_get(host);
@@ -1257,7 +1257,7 @@ out:
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 //[NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
-	mutex_unlock(&host->carddetect_lock); 
+//	mutex_unlock(&host->carddetect_lock); 
 //]NAGSM_Android_HDLNC_SDcard_shinjonghyun_20100504 : mutual exclusion when MoviNand and SD cardusing using this funtion
 
 }

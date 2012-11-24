@@ -1712,7 +1712,7 @@ struct platform_device sec_device_dpram = {
 	.id	= -1,
 };
 
-#ifdef CONFIG_FB_S3C_TL2796 
+#if defined(CONFIG_FB_S3C_TL2796) || defined (CONFIG_FB_S3C_uPD161224) 
 static void tl2796_cfg_gpio(struct platform_device *pdev)
 {
 	int i;
@@ -3436,6 +3436,10 @@ static int s5ka3dfx_power_off(void)
 		pr_err("Failed to disable regulator vga_avdd\n");
 		return -EINVAL;
 	}*/
+
+	// Turn CAM_SENSOR_A_2.8V(VDDA) off
+	gpio_direction_output(GPIO_GPB7, 1);
+	gpio_set_value(GPIO_GPB7, 0);
 
 	gpio_free(GPIO_GPB7);
 	gpio_free(GPIO_CAM_VGA_nRST);
@@ -5336,6 +5340,10 @@ static struct regulator *cam_mipi_regulator;
 void s3c_csis_power(int enable)
 {
 int err;
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+	struct regulator *usb_core_for_cam;
+#endif
+
 
 	if (enable) {
 		if (ldo3_status == 0)
@@ -5360,9 +5368,20 @@ int err;
 			if (err) {
 					pr_err("Failed to enable cam_mipi_regulator\n");
 	}
-	
-		__s5p_hdmi_phy_power_offtest();
+
+
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+	    usb_core_for_cam = regulator_get(NULL, "usb_core");
+		if (IS_ERR_OR_NULL(usb_core_for_cam)) {
+			pr_err("failed to get usb_core during cam");
+		}
+		err = regulator_enable(usb_core_for_cam);
+		if (err) {
+				pr_err("Failed to enable usb_core during cam \n");
+				}
 		
+		__s5p_hdmi_phy_power_offtest();
+#endif
 
 	}
 	else {
@@ -5390,6 +5409,20 @@ int err;
 					return err;
 					}
 		}
+		
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+		usb_core_for_cam = regulator_get(NULL, "usb_core");
+		if (IS_ERR_OR_NULL(usb_core_for_cam)) {
+			pr_err("failed to get usb_core during cam");
+		return -EINVAL;
+		}
+		err = regulator_disable(usb_core_for_cam);
+		if (err) {
+				pr_err("Failed to disable usb_core during cam \n");
+				return err;
+				}
+#endif
+
 	}
 
 }
@@ -5639,77 +5672,46 @@ static void mxt224_power_on(void)
 {
 
 printk("mxt224_power_on\n");
-#if 0
-	s3c_gpio_cfgpin(GPIO_TSP_LDO_ON, S3C_GPIO_OUTPUT);
-	s3c_gpio_setpull(GPIO_TSP_LDO_ON, S3C_GPIO_PULL_NONE);
-	gpio_set_value(GPIO_TSP_LDO_ON, GPIO_LEVEL_HIGH);
-	mdelay(70);
-	s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
-	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
-	/*mdelay(40); */
-	/* printk("mxt224_power_on is finished\n"); */
 
+//	s3c_gpio_cfgpin(GPIO_TOUCH_INT, S3C_GPIO_INPUT);
+//	s3c_gpio_setpull(GPIO_TOUCH_INT, S3C_GPIO_PULL_UP);
 
+	tspvdd = regulator_get(NULL, "tsp_vdd");
+        if (IS_ERR(tspvdd)) {
+                printk(KERN_ERR "%s: cant get TSP_VDD\n", __func__);
+		return;
+        }
 
-	int tint = GPIO_TOUCH_INT;
-	s3c_gpio_cfgpin(tint, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(tint, S3C_GPIO_PULL_UP);
+	tspavdd = regulator_get(NULL, "tsp_avdd");
+        if (IS_ERR(tspvdd)) {
+                printk(KERN_ERR "%s: cant get TSP_AVDD\n", __func__);
+		return;
+        }	
 
-tspvdd = regulator_get(NULL, "tsp_vdd");
-	if (IS_ERR(tspvdd)) {
-			printk(KERN_ERR "%s: cant get TSP_VDD\n", __func__);
-	return;
-	}
-	printk("mxt224_power_on vdd\n");
+	msleep(10);
+	regulator_enable(tspvdd);
+	regulator_enable(tspavdd);
 
-tspavdd = regulator_get(NULL, "tsp_avdd");
-	if (IS_ERR(tspvdd)) {
-			printk(KERN_ERR "%s: cant get TSP_AVDD\n", __func__);
-	return;
-	}	
-	printk("mxt224_power_on avdd\n");
-
-//regulator_disable(tspvdd);
-//regulator_disable(tspavdd);
-
-
-msleep(10);
-regulator_enable(tspvdd);
-regulator_enable(tspavdd);
-#endif
-
+msleep(100);
 
 
 }
 
 static void mxt224_power_off(void)
 {
-#if 0
-	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_DOWN);
+//s3c_gpio_cfgpin(GPIO_TOUCH_INT, S3C_GPIO_INPUT);
+//s3c_gpio_setpull(GPIO_TOUCH_INT, S3C_GPIO_PULL_DOWN);
+printk("mxt224_power_off \n");
 
-	s3c_gpio_cfgpin(GPIO_TSP_LDO_ON, S3C_GPIO_OUTPUT);
-	s3c_gpio_setpull(GPIO_TSP_LDO_ON, S3C_GPIO_PULL_NONE);
-	gpio_set_value(GPIO_TSP_LDO_ON, GPIO_LEVEL_LOW);
-	/* printk("mxt224_power_off is finished\n"); */
-#endif
+regulator_disable(tspvdd);
+regulator_disable(tspavdd);
+
 }
 
-static void mxt224_register_callback(void *function)
-{
-	printk("mxt224_register_callback\n");
 
-	//charging_cbs.tsp_set_charging_cable = function;
-}
-
-static void mxt224_read_ta_status(bool *ta_status)
-{
-	
-	printk("mxt224_read_ta_status\n");
-	
-
-	//*ta_status = is_cable_attached;
-}
+/*
+	Configuration for MXT224
+*/
 
 /*
 	Configuration for MXT224
@@ -5721,11 +5723,11 @@ static u8 t7_config[] = {GEN_POWERCONFIG_T7,
 static u8 t8_config[] = {GEN_ACQUISITIONCONFIG_T8,
 				10, 0, 5, 1, 0, 0, 9, 30};/*byte 3: 0*/
 static u8 t9_config[] = {TOUCH_MULTITOUCHSCREEN_T9,
-				131, 0, 0, 19, 11, 0, 32, MXT224_THRESHOLD, 2, 1,
+				139, 0, 0, 19, 11, 0, 16, MXT224_THRESHOLD, 2, 1,
 				0,
-				15,		/* MOVHYSTI */
-				1, 11, MXT224_MAX_MT_FINGERS, 5, 40, 10, 31, 3,
-				223, 1, 0, 0, 0, 0, 143, 55, 143, 90, 18};
+				3,		/* MOVHYSTI */
+				1, 46, MXT224_MAX_MT_FINGERS, 3, 40, 10, 31, 3,
+				223, 1, 0, 0, 0, 0, 143, 50, 143, 90, 18};
 
 static u8 t18_config[] = {SPT_COMCONFIG_T18,
 				0, 1};
@@ -5754,17 +5756,17 @@ static const u8 *mxt224_config[] = {
 */
 
 static u8 t7_config_e[] = {GEN_POWERCONFIG_T7,
-				32, 255, 50};
+					32, 255, 20};
 static u8 t8_config_e[] = {GEN_ACQUISITIONCONFIG_T8,
-				27, 0, 5, 1, 0, 0, 8, 8, 40, 55};
+					27, 0, 5, 1, 0, 0, 4, 35, 40, 55};
 
 /* MXT224E_0V5_CONFIG */
 /* NEXTTCHDI added */
 static u8 t9_config_e[] = {TOUCH_MULTITOUCHSCREEN_T9,
-				139, 0, 0, 19, 11, 0, 16, 35, 2, 1,
-				10, 3, 1, 0, MXT224_MAX_MT_FINGERS, 5, 40, 10, 31, 3,
+					139, 0, 0, 19, 11, 0, 32, 50, 2, 1,
+					10, 3, 1, 46, MXT224_MAX_MT_FINGERS, 5, 40, 10, 31, 3,
 				223, 1, 10, 10, 10, 10, 143, 40, 143, 80,
-				18, 15, 50, 50, 2};
+				18, 15, 50, 50, 0};
 
 static u8 t15_config_e[] = {TOUCH_KEYARRAY_T15,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -5776,28 +5778,36 @@ static u8 t23_config_e[] = {TOUCH_PROXIMITY_T23,
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static u8 t25_config_e[] = {SPT_SELFTEST_T25,
-				0, 0, 3000, 0, 0, 0, 0, 0};
+					0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static u8 t40_config_e[] = {PROCI_GRIPSUPPRESSION_T40,
 				0, 0, 0, 0, 0};
 
 static u8 t42_config_e[] = {PROCI_TOUCHSUPPRESSION_T42,
-				0, 0, 0, 0, 0, 0, 0, 0};
-
-static u8 t46_config_e[] = {SPT_CTECONFIG_T46,
-				0, 3, 16, 28, 0, 0, 1, 0, 0};
-
-static u8 t47_config_e[] = {PROCI_STYLUS_T47,
-				0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-/*MXT224E_0V5_CONFIG */
-static u8 t48_config_e[] = {PROCG_NOISESUPPRESSION_T48,
-				1, 12, 112, 0, 0, 0, 0, 0, 0, 0,
-				0, 0, 0, 6, 6, 0, 0, 100, 4, 64,
+					0, 0, 0, 0, 0, 0, 0, 0};
+	
+	static u8 t46_config_e[] = {SPT_CTECONFIG_T46,
+					0, 3, 24, 35, 0, 0, 1, 0};
+	
+	static u8 t47_config_e[] = {PROCI_STYLUS_T47,
+					0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	
+	/*MXT224E_0V5_CONFIG */
+	static u8 t48_config_e[] = {PROCG_NOISESUPPRESSION_T48,
+		3, 132, 64, 0, 0, 0, 0, 0, 10, 15, 
+		0, 0, 0, 6, 6, 0, 0, 64, 4, 64, 
+					10, 0, 20, 5, 0, 38, 0, 5, 0, 0,
+					0, 0, 0, 0, 32, 50, 2, 3, 1, 46,
+		MXT224_MAX_MT_FINGERS, 10, 40, 10, 10, 10, 10, 143, 40, 143, 
+		80, 18, 15, 0 };
+	
+	static u8 t48_config_e_ta[] = {PROCG_NOISESUPPRESSION_T48,
+		3, 132, 82, 0, 0, 0, 0, 0, 10, 15,
+		0, 0, 0, 6, 6, 0, 0, 64, 4, 64, 
 				10, 0, 20, 5, 0, 38, 0, 20, 0, 0,
-				0, 0, 0, 0, 0, 55, 2, 5, 2, 0,
-				5, 10, 10, 0, 0, 16, 17, 146, 60, 149,
-				68, 25, 15, 3};
+		0, 0, 0, 0, 0, 40, 2, 5, 2, 47, 
+		MXT224_MAX_MT_FINGERS, 10, 40, 240, 245, 10, 10, 148, 50, 143, 
+		80, 18, 10, 0 };
 
 
 
@@ -5822,9 +5832,11 @@ static const u8 *mxt224e_config[] = {
 
 static struct mxt224_platform_data mxt224_data = {
 	.max_finger_touches = MXT224_MAX_MT_FINGERS,
-	.gpio_read_done =  IRQ_EINT_GROUP(18, 5),
+	.gpio_read_done =  S5PV210_GPJ0(5),
 	.config = mxt224_config,
 	.config_e = mxt224e_config,
+	.t48_ta_cfg = t48_config_e_ta,
+
 	.min_x = 0,
 	.max_x = 480,
 	.min_y = 0,
@@ -5835,10 +5847,8 @@ static struct mxt224_platform_data mxt224_data = {
 	.max_w = 30,
 	.power_on = mxt224_power_on,
 	.power_off = mxt224_power_off,
-	.register_cb = mxt224_register_callback,
-	.read_ta_status = mxt224_read_ta_status,
-};
 
+};
 
 
 
@@ -6704,7 +6714,7 @@ static struct sec_jack_zone sec_jack_zones[] = {
 		 */
 #if defined(CONFIG_S5PC110_KEPLER_BOARD) || defined (CONFIG_S5PC110_DEMPSEY_BOARD)  
 		.adc_high = 600,
-#elif defined(CONFIG_S5PC110_HAWK_BOARD)
+#elif defined(CONFIG_S5PC110_HAWK_BOARD) || defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD)
 		.adc_high = 300,
 #else
 		.adc_high = 900,
@@ -6721,6 +6731,8 @@ static struct sec_jack_zone sec_jack_zones[] = {
 		.adc_high = 700,
 #elif defined(CONFIG_S5PC110_HAWK_BOARD)
 		.adc_high = 350,
+#elif defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD)	
+		.adc_high = 300,	
 #else
 		.adc_high = 2000,
 #endif
@@ -6736,6 +6748,8 @@ static struct sec_jack_zone sec_jack_zones[] = {
 		.adc_high = 3000,
 #elif defined(CONFIG_S5PC110_HAWK_BOARD)
 		.adc_high = 3300,
+#elif defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD)
+		.adc_high = 3700,
 #else
 		.adc_high = 3400,
 #endif
@@ -7184,12 +7198,16 @@ static int wlan_power_en(int onoff)
 		s3c_gpio_slp_cfgpin(GPIO_WLAN_nRST, S3C_GPIO_SLP_OUT0);
 		s3c_gpio_slp_setpull_updown(GPIO_WLAN_nRST, S3C_GPIO_PULL_NONE);
 
-		//if (gpio_get_value(GPIO_BT_nRST) == 0) {
+#if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+		if (gpio_get_value(GPIO_BT_nRST) == 0) {
+#endif			
 			gpio_set_value(GPIO_WLAN_BT_EN, GPIO_LEVEL_LOW);
 			s3c_gpio_slp_cfgpin(GPIO_WLAN_BT_EN, S3C_GPIO_SLP_OUT0);
 			s3c_gpio_slp_setpull_updown(GPIO_WLAN_BT_EN,
 						S3C_GPIO_PULL_NONE);
-		//}
+#if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)							
+		}
+#endif	
 	}
 	return 0;
 }

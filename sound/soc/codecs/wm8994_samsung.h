@@ -152,6 +152,9 @@ Codec Output Path BIT
 #define CMD_FACTORY_SUB_MIC_OFF	19
 #define CMD_FACTORY_SUB_MIC_ON	20
 
+#define CMD_GTALK_MUTE_ON   21
+#define CMD_GTALK_MUTE_OFF  22
+
 enum AUDIENCE_State {AUDIENCE_OFF, AUDIENCE_ON};
 enum FactorySubMIC_State {FAC_SUB_MIC_OFF, FAC_SUB_MIC_ON};
 enum TTY_State {TTY_OFF, TTY_ON};
@@ -159,6 +162,7 @@ enum HAC_State {HAC_OFF, HAC_ON};
 enum QIK_state	{QIK_OFF, QIK_ON};
 enum state{OFF1, ON1};
 enum ganlite {wificall_off, wificall_on};
+enum MIC_MUTE {MUTE_OFF, MUTE_ON};
 
 //]mook_GB : add in audience
 
@@ -181,7 +185,8 @@ enum audio_path	{
 enum mic_path			{MAIN, SUB, BT_REC, SPK_MIC, MIC_OFF};
 #elif defined(CONFIG_S5PC110_KEPLER_BOARD)|| defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD)||defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 enum mic_path			{MAIN, SUB, BT_REC, MIC_OFF};
-#if defined (CONFIG_S5PC110_KEPLER_BOARD)
+#if defined (CONFIG_S5PC110_KEPLER_BOARD)|| defined(CONFIG_S5PC110_DEMPSEY_BOARD) || defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD )
+ 
 enum call_recording_channel {CH_OFF, CH_UPLINK, CH_DOWNLINK, CH_UDLINK};
 enum voice_record_path     { CALL_RECORDING_OFF, CALL_RECORDING_MAIN, CALL_RECORDING_SUB};
 #endif
@@ -254,8 +259,9 @@ struct wm8994_priv {
 	unsigned int TTY_state;
 	unsigned int HAC_state;
 	unsigned int cur_audience;
+	unsigned int mic_mute;
 //]mook_GB : add in audience
-#if defined (CONFIG_S5PC110_KEPLER_BOARD)
+#if defined (CONFIG_S5PC110_KEPLER_BOARD)|| defined(CONFIG_S5PC110_DEMPSEY_BOARD) || defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD )
 	enum voice_record_path call_record_path;
 	enum call_recording_channel call_record_ch;
 #endif
@@ -315,9 +321,17 @@ void wm8994_call_recording_change_path(struct snd_soc_codec *codec);
 void wm8994_set_voicecall_record_off(struct snd_soc_codec *codec);
 
 
-#elif (defined CONFIG_S5PC110_HAWK_BOARD) || (defined CONFIG_S5PC110_VIBRANTPLUS_BOARD)
+#elif (defined CONFIG_S5PC110_HAWK_BOARD)
 void wm8994_set_voicecall_tty(struct snd_soc_codec *codec);
 void wm8994_set_voicecall_hac(struct snd_soc_codec *codec);
+
+#elif (defined CONFIG_S5PC110_VIBRANTPLUS_BOARD)
+void wm8994_set_voicecall_tty(struct snd_soc_codec *codec);
+void wm8994_set_voicecall_hac(struct snd_soc_codec *codec);
+void wm8994_set_voicecall_record(struct snd_soc_codec *codec, int path_num);
+void wm8994_call_recording_change_path(struct snd_soc_codec *codec);
+void wm8994_set_voicecall_record_off(struct snd_soc_codec *codec);
+
 #else
 void wm8994_set_voicecall_hac(struct snd_soc_codec *codec);
 #endif

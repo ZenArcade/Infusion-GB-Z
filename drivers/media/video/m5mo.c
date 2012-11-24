@@ -26,8 +26,9 @@
 
 #define M5MO_DRIVER_NAME		"M5MO"
 
-#define M5MO_FSI_FW_PATH			"/system/firmware/FSI/RS_M5LS.bin"
-#define M5MO_BSI_FW_PATH			"/system/firmware/RS_M5LS.bin"
+#define M5MOTB_FW_PATH		"/system/firmware/RS_M5LS_TB.bin"	/* TECHWIN - SONY */
+#define M5MOOI_FW_PATH		"/system/firmware/RS_M5LS_OI.bin"	/* FIBEROPTICS - S.LSI */
+#define M5MOSI_FW_PATH		"/system/firmware/RS_M5LS_SI.bin"	/* ELECTRO MECHANICS - S.LSI */
 
 #define SDCARD_FW
 #ifdef SDCARD_FW
@@ -1219,12 +1220,6 @@ static int m5mo_get_sensor_fw_version(struct v4l2_subdev *sd,
 	strncpy(str, buf, sizeof(buf));
 	#endif
 	
-	//m5mo_get_standard_fw_version(str, &ver);
-	
-	//NAGSM_ANDROID_HQ_CAMERA_SoojinKim_20101215
-	if (str[1] == 'A')
-		IS_M5MO_FSI = 1;
-
 	cam_info("%s\n", str);
 
 	//NAGSM_ANDROID_HQ_CAMERA_SUNGKOOLEE_20110118
@@ -1257,10 +1252,31 @@ static int m5mo_get_sensor_fw_version(struct v4l2_subdev *sd,
 	return 0;
 }
 
+
+static int m5mo_get_sensor_version(struct v4l2_subdev *sd, char *buf)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	u8 val;
+	int err;
+
+	/* set pin */
+	val = 0x7E;
+	err = m5mo_mem_write(client, 0x04, sizeof(val), 0x50000308, &val);
+	CHECK_ERR(err);
+
+	err = m5mo_mem_read(client, M5MO_FW_VER_LEN,
+		M5MO_FLASH_BASE_ADDR + M5MO_FW_VER_FILE_CUR, buf);
+
+	cam_dbg("%s\n", buf);
+	return 0;
+}
+
+
 static int m5mo_get_phone_fw_version(struct v4l2_subdev *sd, char *str)
 {
 	//struct m5mo_fw_version ver;
 	u8 buf[M5MO_FW_VER_LEN] = {0, };
+	u8 sensor_ver[M5MO_FW_VER_LEN] = {0, };
 	int err;
 
 	struct file *fp;
@@ -1275,17 +1291,21 @@ static int m5mo_get_phone_fw_version(struct v4l2_subdev *sd, char *str)
 	if (IS_ERR(fp)) 
 	#endif	
 	{
-		if(IS_M5MO_FSI)
-			fp = filp_open(M5MO_FSI_FW_PATH, O_RDONLY, S_IRUSR);
-		else
-			fp = filp_open(M5MO_BSI_FW_PATH, O_RDONLY, S_IRUSR);
+		m5mo_get_sensor_version(sd, sensor_ver);
 
-		if (IS_ERR(fp)) {
-			if(IS_M5MO_FSI)
-				cam_err("failed to open %s\n", M5MO_FSI_FW_PATH);
-			else
-				cam_err("failed to open %s\n", M5MO_BSI_FW_PATH);
-					
+		if (sensor_ver[0] == 'T' && sensor_ver[1] == 'B') {
+			fp = filp_open(M5MOTB_FW_PATH, O_RDONLY, S_IRUSR);
+		} else if (sensor_ver[0] == 'O' && sensor_ver[1] == 'I') {
+			fp = filp_open(M5MOOI_FW_PATH, O_RDONLY, S_IRUSR);
+		} else if (sensor_ver[0] == 'S' && sensor_ver[1] == 'I') {
+			fp = filp_open(M5MOSI_FW_PATH, O_RDONLY, S_IRUSR);			
+		} else {
+			cam_warn("cannot find the matched F/W file\n");
+			fp = filp_open(M5MOTB_FW_PATH, O_RDONLY, S_IRUSR);
+		}
+			
+		if (IS_ERR(fp)) {	
+			cam_warn("failed to open file\n");
 			return -ENOENT;
 		}
 	}
@@ -2099,7 +2119,7 @@ static int m5mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	CHECK_ERR(err);
 	
 	state->m_zoom_level = val;
-		
+
 	cam_dbg("X\n");
 	return 0;
 }
@@ -2799,6 +2819,7 @@ static int m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u3
 static int m5mo_load_fw(struct v4l2_subdev *sd)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	u8 sensor_ver[M5MO_FW_VER_LEN] = {0, };
 	u8 *buf = NULL, val, id;
 	int err;
 
@@ -2814,27 +2835,26 @@ static int m5mo_load_fw(struct v4l2_subdev *sd)
 	if (IS_ERR(fp)) 
 	#endif	
 	{
-		if(IS_M5MO_FSI)
-			fp = filp_open(M5MO_FSI_FW_PATH, O_RDONLY, S_IRUSR);
-		else
-			fp = filp_open(M5MO_BSI_FW_PATH, O_RDONLY, S_IRUSR);
+		m5mo_get_sensor_version(sd, sensor_ver);
 
-		if (IS_ERR(fp)) {
-			if(IS_M5MO_FSI)
-				cam_err("failed to open %s\n", M5MO_FSI_FW_PATH);
-			else
-				cam_err("failed to open %s\n", M5MO_BSI_FW_PATH);
-					
+		if (sensor_ver[0] == 'T' && sensor_ver[1] == 'B') {
+			fp = filp_open(M5MOTB_FW_PATH, O_RDONLY, S_IRUSR);
+		} else if (sensor_ver[0] == 'O' && sensor_ver[1] == 'I') {
+			fp = filp_open(M5MOOI_FW_PATH, O_RDONLY, S_IRUSR);
+		} else if (sensor_ver[0] == 'S' && sensor_ver[1] == 'I') {
+			fp = filp_open(M5MOSI_FW_PATH, O_RDONLY, S_IRUSR);			
+		} else {
+			cam_warn("cannot find the matched F/W file\n");
+			fp = filp_open(M5MOTB_FW_PATH, O_RDONLY, S_IRUSR);
+		}
+			
+		if (IS_ERR(fp)) {	
+			cam_warn("failed to open file\n");
 			return -ENOENT;
 		}
 	}
 
 	fsize = fp->f_path.dentry->d_inode->i_size;
-	
-	if(IS_M5MO_FSI)
-		cam_info("start, file path %s, size %ld Bytes\n", M5MO_FSI_FW_PATH, fsize);
-	else
-		cam_info("start, file path %s, size %ld Bytes\n", M5MO_BSI_FW_PATH, fsize);
 	
 	buf = vmalloc(fsize);
 	if (!buf) {
@@ -3172,7 +3192,7 @@ static int m5mo_probe(struct i2c_client *client,
 	state = kzalloc(sizeof(struct m5mo_state), GFP_KERNEL);
 	if (state == NULL)
 		return -ENOMEM;
-	
+
 	sd = &state->sd;
 	strcpy(sd->name, M5MO_DRIVER_NAME);
 	

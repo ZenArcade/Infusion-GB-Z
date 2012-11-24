@@ -166,67 +166,6 @@ const unsigned short LD9040_SM2_SEQ_ELVSS_OFF[] = {
  
 
 
- const unsigned short LD9040_SM2_SEQ_GTCON[] = {
-	0xF7, 0x09,
-
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	ENDDEF, 0x00
-};
-
- const unsigned short LD9040_SM2_SEQ_PANEL_CONDITION[] = {
-	0xF8, 0x05,
-#if 1
-	DATA_ONLY, 0x5E,
-	DATA_ONLY, 0x96,
-	DATA_ONLY, 0x6B,
-	DATA_ONLY, 0x7D,
-	DATA_ONLY, 0x0D,
-	DATA_ONLY, 0x3F,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x32,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x07,
-	DATA_ONLY, 0x05,
-	DATA_ONLY, 0x1F,
-	DATA_ONLY, 0x1F,
-	DATA_ONLY, 0x1F,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-#else
-	DATA_ONLY, 0x65,
-	DATA_ONLY, 0x96,
-	DATA_ONLY, 0x71,
-	DATA_ONLY, 0x7D,
-	DATA_ONLY, 0x19,
-	DATA_ONLY, 0x3B,
-	DATA_ONLY, 0x0D,
-	DATA_ONLY, 0x19,
-	DATA_ONLY, 0x7E,
-	DATA_ONLY, 0x0D,
-	DATA_ONLY, 0xE2,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x00,
-	DATA_ONLY, 0x7E,
-	DATA_ONLY, 0x7D,
-	DATA_ONLY, 0x07,
-	DATA_ONLY, 0x07,
-	DATA_ONLY, 0x20,
-	DATA_ONLY, 0x20,
-	DATA_ONLY, 0x20,
-	DATA_ONLY, 0x02,
-	DATA_ONLY, 0x02,
-#endif
-	ENDDEF, 0x00
-};
-
-
 #if 0 
 //Original Gamma at init set to 22_300cd
 
@@ -333,21 +272,7 @@ const unsigned short LD9040_SM2_SEQ_ELVSS_OFF[] = {
 	ENDDEF, 0x00
 };
 
- const unsigned short LD9040_SM2_SEQ_DISPCTL[] = {
-	0xF2, 0x02,
-
-#if 0
-	DATA_ONLY, 0x06,
-	DATA_ONLY, 0x0A,
-#else
-	DATA_ONLY, 0x08,
-	DATA_ONLY, 0x08,
-#endif
-	DATA_ONLY, 0x10,
-	DATA_ONLY, 0x10,
-	ENDDEF, 0x00
-};
-
+ 
 
  const unsigned short LD9040_SM2_SEQ_MANPWR[] = {
 	0xB0, 0x04,

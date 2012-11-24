@@ -733,7 +733,7 @@ void sii9234_cfg_power(bool on)
 		
 		rc = regulator_disable(mhl_ldo5);		//VCC_3.3V_MHL
 		if (rc) {
-			pr_err("%s: mhl_ldo5 vreg enable failed (%d)\n", __func__, rc);
+			pr_err("%s: mhl_ldo4 vreg enable failed (%d)\n", __func__, rc);
 			return;
 		}
 

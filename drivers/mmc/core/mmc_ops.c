@@ -12,13 +12,70 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/scatterlist.h>
-
+#include <linux/miscdevice.h>
+#include <linux/fs.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/mmc.h>
 
 #include "core.h"
 #include "mmc_ops.h"
+
+#define _EXPORT_CSD_
+
+#ifdef _EXPORT_CSD_
+
+static unsigned char write_protect_enable;
+static struct class *csd_status;
+static struct device *csd_dev;
+static unsigned int resp;
+
+static ssize_t write_protect_show( struct device *dev, 
+					struct device_attribute *attr, 
+					char *buf)
+{
+	printk(KERN_ERR "[MMC] CSD resp = %x \n", resp);
+	return sprintf(buf, "%d\n", write_protect_enable);
+}
+
+static DEVICE_ATTR(write_protect, S_IRUGO, write_protect_show, NULL);
+
+static int __init write_protect_init (void)
+{
+
+	csd_status = class_create(THIS_MODULE, "csd");
+	if (IS_ERR(csd_status)){
+		printk(KERN_ERR "Failed to create class csd \n");
+		return -1;
+	}
+	csd_dev = device_create(csd_status, NULL, 0, NULL, "csd_status");
+	if(IS_ERR(csd_dev)) {
+		printk(KERN_ERR "Failed to create device csd_status \n");
+		return -1;
+	}	
+	if(device_create_file(csd_dev, &dev_attr_write_protect)<0){
+		printk(KERN_ERR "Failed to create device csd_status \n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static void __exit write_protect_exit(void)
+{
+	device_remove_file(csd_dev, &dev_attr_write_protect);
+}
+
+module_init(write_protect_init);
+module_exit(write_protect_exit);
+
+MODULE_AUTHOR("Samsung");
+MODULE_DESCRIPTION("Samsung csd.status driver");
+MODULE_LICENSE("GPL");
+#endif
+
+
+
 
 static int _mmc_select_card(struct mmc_host *host, struct mmc_card *card)
 {
@@ -225,6 +282,7 @@ mmc_send_cxd_native(struct mmc_host *host, u32 arg, u32 *cxd, int opcode)
 	int err;
 	struct mmc_command cmd;
 
+
 	BUG_ON(!host);
 	BUG_ON(!cxd);
 
@@ -238,6 +296,14 @@ mmc_send_cxd_native(struct mmc_host *host, u32 arg, u32 *cxd, int opcode)
 	if (err)
 		return err;
 
+#ifdef _EXPORT_CSD_
+ 	write_protect_enable = 0;
+	resp = cmd.resp[3];	
+	if((resp >> 13 )& 0x1){
+		printk(KERN_ERR "[MMC] WRITE PROTECT ENABLE BIT SET  \n");
+		write_protect_enable = 1;
+	}
+#endif
 	memcpy(cxd, cmd.resp, sizeof(u32) * 4);
 
 	return 0;

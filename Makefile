@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 35
-EXTRAVERSION = .7-I997RUXKG3-CL366622
+EXTRAVERSION = .7-I997UCLB3-CL977492
 NAME = Yokohama
 
 # *DOCUMENTATION*
@@ -580,7 +580,7 @@ KBUILD_CFLAGS += $(call cc-option,-Wno-pointer-sign,)
 KBUILD_CFLAGS	+= $(call cc-option,-fno-strict-overflow)
 
 # conserve stack if available
-#KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
+KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
 
 # Add user supplied CPPFLAGS, AFLAGS and CFLAGS as the last assignments
 # But warn user when we do so

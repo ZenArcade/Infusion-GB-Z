@@ -140,10 +140,10 @@ const unsigned short SEQ_PANEL_CONDITION[] = {
 	DATA_ONLY, 0x00,
 	DATA_ONLY, 0x00,
 	DATA_ONLY, 0x07,
-	DATA_ONLY, 0x07,
-	DATA_ONLY, 0x20,
-	DATA_ONLY, 0x20,
-	DATA_ONLY, 0x20,
+	DATA_ONLY, 0x05,
+	DATA_ONLY, 0x1F,
+	DATA_ONLY, 0x1F,
+	DATA_ONLY, 0x1F,
 	DATA_ONLY, 0x00,
 	DATA_ONLY, 0x00,
 	ENDDEF, 0x00
@@ -1432,6 +1432,7 @@ int ldi_common_enable()
 int ldi_common_disable()
 {
 	int ret;
+	disp_ready = 0;
 
 	if(LCD_ID == 1)
 	{
@@ -1453,7 +1454,7 @@ int ldi_common_disable()
 
 	SetLDIEnabledFlag(0);
 
-	disp_ready = 0;
+//	disp_ready = 0;
 	return ret;
 }
 
@@ -1484,28 +1485,41 @@ int ldi_power_on()
 		msleep(pd->reset_delay);
 	}
 #endif 
+	mutex_lock(&g_lcd.lock);
+
 	ret = ldi_common_init();
 
 
 	if (ret) {
 		dev_err(g_lcd.dev, "failed to initialize common ldi.\n");
-		return ret;
+		//return ret;		
+		goto out_error;
 	}
 
 	ret = ldi_dev_init();
 
 		if (ret) {
 		dev_err(g_lcd.dev, "failed to initialize rev specific ldi.\n");
-		return ret;
+		//return ret;
+		goto out_error;
+		
 	}
 
 	ret = update_brightness(g_Brightness_Level);
+	mutex_unlock(&g_lcd.lock);
+
 		if (ret) {
 		dev_err(g_lcd.dev, "failed to initialize brightness\n");
 		return ret;
 	}
-
 	return 0;
+		
+
+out_error:
+	mutex_unlock(&g_lcd.lock);
+	return ret; 
+
+
 }
 
 int ldi_power_off()
@@ -1600,8 +1614,10 @@ int ldi_power_off()
 
 	/* brightness setting from platform is from 0 to 255
 	 * But in this driver, brightness is only supported from 0 to 24 */
-	g_Brightness_Level = (brightness*10)/106; 
 
+	mutex_lock(&g_lcd.lock);
+
+	g_Brightness_Level = (brightness*10)/106; 
 
 	//If Display is OFF Brightness settings on resume always need to be called after LDI init 
 
@@ -1611,6 +1627,8 @@ int ldi_power_off()
 	}
 	else
 		gprintk("g_Brightness_Level = %d, but ldi is not enabled yet\n", g_Brightness_Level);
+
+	mutex_unlock(&g_lcd.lock);
 
 
 	return ret;
@@ -1807,6 +1825,8 @@ err:
 	/* ldi lcd panel uses 3-wire 9bits SPI Mode. */
 	spi->bits_per_word = 9;
 
+	mutex_init(&g_lcd.lock);
+
 	ret = spi_setup(spi);
 	if (ret < 0) {
 		dev_err(&spi->dev, "spi setup failed.\n");
@@ -1956,6 +1976,7 @@ err:
 	return 0;
 
 out_free_lcd:
+	mutex_destroy(&g_lcd.lock);
 
 	printk("ldi panel driver has not been probed.\n");
 	return ret;

@@ -502,12 +502,12 @@ dhd_prot_dstats(dhd_pub_t *dhd)
 int
 dhd_enable_keepalive(dhd_pub_t *dhd, uint32 period)
 {
-	int	buf_len;
-	int	str_len = 10;
+	int buf_len;
+	int str_len = 10;
 	char buf[256];
 
 	wl_keep_alive_pkt_t keep_alive_pkt;
-	wl_keep_alive_pkt_t	*pkt;
+	wl_keep_alive_pkt_t *pkt;
 
 	memset(buf, 0, sizeof(buf));
 	
@@ -516,25 +516,14 @@ dhd_enable_keepalive(dhd_pub_t *dhd, uint32 period)
 
 	pkt = (wl_keep_alive_pkt_t *) (buf + str_len + 1);
 	keep_alive_pkt.period_msec = period;
-	buf_len = str_len + 1;
+	keep_alive_pkt.len_bytes = 0;
+	buf_len = str_len + 1 + sizeof(wl_keep_alive_pkt_t);
+	memcpy((char *)pkt, &keep_alive_pkt, WL_KEEP_ALIVE_FIXED_LEN);
 
 	if (0 == period) {
-		keep_alive_pkt.len_bytes = 0;
-		buf_len += sizeof(wl_keep_alive_pkt_t);
 		DHD_TRACE(("Disable Keep Alive\n"));
-		memcpy((char *)pkt, &keep_alive_pkt, WL_KEEP_ALIVE_FIXED_LEN);
 	}
 	else {
-		uint8 contents[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0};
-
-		keep_alive_pkt.len_bytes = 16;
-		memcpy((char *)pkt, &keep_alive_pkt, WL_KEEP_ALIVE_FIXED_LEN);
-
-		bcopy(contents, pkt->data, sizeof(contents));
-		/* source address */
-		bcopy(&dhd->mac, &pkt->data[6], 6);
-
-		buf_len += (WL_KEEP_ALIVE_FIXED_LEN + keep_alive_pkt.len_bytes);
 		DHD_TRACE(("Enable Keep Alive\n"));
 	}
 
@@ -558,16 +547,18 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	char eventmask[WL_EVENTING_MASK_LEN];
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 
-	uint up = 0;
-	uint roamvar = 1;
+	uint up = 0;#ifdef BCMCCX
+	uint roamvar = 0;
+#else	
+	uint roamvar = 1;#endif
 	uint power_mode = PM_FAST;
 	uint32 dongle_align = DHD_SDALIGN;
 	uint32 glom = 0;
 	uint bcn_timeout = 12;
 	int arpoe = 1;
-	int arp_ol = 0xf;
+	int arp_ol = 0xf;#ifndef BCMCCX	
 	int scan_assoc_time = 40;
-	int scan_unassoc_time = 80;
+	int scan_unassoc_time = 80;#endif	
 	int assoc_retry = 7;
 	char buf[256];
 #ifdef AP
@@ -605,6 +596,10 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #ifdef SOFTAP
 	}
 #endif /* SOFTAP */
+#ifdef BCMCCX
+	if(roamvar)
+		DHD_ERROR((" roam_off =%d BCMCCX roam_off should be 0\n",roamvar));
+#endif
 
 #ifdef CONFIG_CONTROL_PM
 	sec_control_pm(dhd, &power_mode);
@@ -686,15 +681,18 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #endif
 #ifdef USE_FW_TRACE
 	setbit(eventmask, WLC_E_TRACE);
-#endif
+#endif#if defined(BCMCCX) && defined(BCMDBG_EVENT)
+	setbit(eventmask, WLC_E_ADDTS_IND);
+	setbit(eventmask, WLC_E_DELTS_IND);
+#endif /* defined(BCMCCX) && (BCMDBG_EVENT) */
 
 	bcm_mkiovar("event_msgs", eventmask, WL_EVENTING_MASK_LEN, iovbuf, sizeof(iovbuf));
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-
+#ifndef BCMCCX
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_SCAN_CHANNEL_TIME, (char *)&scan_assoc_time,
 		sizeof(scan_assoc_time), TRUE, 0);
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_SCAN_UNASSOC_TIME, (char *)&scan_unassoc_time,
-		sizeof(scan_unassoc_time), TRUE, 0);
+		sizeof(scan_unassoc_time), TRUE, 0);#endif	
 
 	/* Set ARP offload */
 	bcm_mkiovar("arpoe", (char *)&arpoe, 4, iovbuf, sizeof(iovbuf));

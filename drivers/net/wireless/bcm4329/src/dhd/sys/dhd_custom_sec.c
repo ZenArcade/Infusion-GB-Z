@@ -78,6 +78,6 @@ void sec_dhd_config_pm(dhd_pub_t *dhd, uint power_mode)
 		}
 	}
 
-	if(fp)
+	if (!IS_ERR(fp) && (fp!=NULL))
 		filp_close(fp, NULL);
 }

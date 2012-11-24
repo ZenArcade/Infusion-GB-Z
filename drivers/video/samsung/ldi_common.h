@@ -62,7 +62,7 @@ struct ldi {
 	unsigned int			gamma_mode;
 	unsigned int			current_brightness;
 	unsigned int			gamma_table_count;
-
+	struct mutex	lock;
 	struct lcd_device		*ld;
 	struct backlight_device		*bd;
 	struct lcd_platform_data	*lcd_pd;

@@ -97,7 +97,7 @@ static struct gpio_event_direct_entry sec_jack_key_map35[] = {
 	{
 		.code	= KEY_UNKNOWN,
 	},
-#elif defined(CONFIG_S5PC110_HAWK_BOARD)
+#elif defined(CONFIG_S5PC110_HAWK_BOARD) || defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD)
 	{
 		.code   = KEY_UNKNOWN,
 	},
@@ -485,7 +485,7 @@ static int sec_jack_probe(struct platform_device *pdev)
 	sec_jack_key_map[0].gpio = pdata->send_end_gpio;
 #if defined(CONFIG_S5PC110_KEPLER_BOARD)||defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 	sec_jack_key_map35[0].gpio = pdata->send_end_gpio_35;
-#elif defined(CONFIG_S5PC110_HAWK_BOARD)
+#elif defined(CONFIG_S5PC110_HAWK_BOARD) || defined(CONFIG_S5PC110_VIBRANTPLUS_BOARD)
 	sec_jack_key_map[1].gpio = pdata->send_end_gpio_35;
 #endif	
 	hi = kzalloc(sizeof(struct sec_jack_info), GFP_KERNEL);

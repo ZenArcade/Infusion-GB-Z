@@ -336,7 +336,7 @@ void input_event(struct input_dev *dev,
 	 *  Forced upload mode key string (tkhwang)
 	 */
 #ifdef CONFIG_KERNEL_DEBUG_SEC
-	static bool first = 0, second = 0;
+	static bool first = 0, second = 0, third = 0;
 
 #if 0	// defined (CONFIG_KEYPAD_S3C)
 	if (strcmp(dev->name,"s3c-keypad")==0) {
@@ -362,6 +362,54 @@ void input_event(struct input_dev *dev,
 #elif 1	/*defined (CONFIG_KEYBOARD_GPIO)*/
 #if defined(CONFIG_S5PC110_KEPLER_BOARD)
 // temporary block forced upload mode.
+#elif defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+
+	if (strcmp(dev->name, "aries-keypad") == 0) {
+		if (value) {
+			if (code == KEY_VOLUMEUP)
+				first = true;
+
+			if ((first == true) && (code == KEY_VOLUMEDOWN))
+				second = true;
+
+			if((first == true) && (second == true) && (code == KEY_POWER))
+				third = true;
+
+
+			/* if(first&&second&&third) */
+			if (first && second && third ) {
+				if ((KERNEL_SEC_DEBUG_LEVEL_MID == kernel_sec_get_debug_level()) ||
+						KERNEL_SEC_DEBUG_LEVEL_HIGH == kernel_sec_get_debug_level()) {
+					/* Display the working callstack for the debugging. */
+//					dump_stack();
+						dump_debug_info_forced_ramd_dump();
+
+					/* kernel_sec_set_debug_level(KERNEL_SEC_DEBUG_LEVEL_HIGH); */
+
+					if (kernel_sec_viraddr_wdt_reset_reg) {
+						pr_err("[%s][line:%d]\n", __func__, __LINE__);
+						kernel_sec_set_cp_upload();
+						/* Save theh final context. */
+						kernel_sec_save_final_context();
+						kernel_sec_set_upload_cause(UPLOAD_CAUSE_FORCED_UPLOAD);
+						/* Reboot. */
+						kernel_sec_hw_reset(false);
+					}
+				}
+			}
+		} else {
+			if(code == KEY_VOLUMEUP)
+				first = false;
+
+			if(code == KEY_VOLUMEDOWN)
+				second = false;
+
+			if(code == KEY_POWER)
+				third = false;
+
+		}
+	}
+
 #else
 	if (strcmp(dev->name, "aries-keypad") == 0) {
 		if (value) {

@@ -171,6 +171,7 @@ static struct s5ka3dfx_regset_table fps_vt_table[] = {
 	S5KA3DFX_REGSET_TABLE_ELEMENT(0, s5ka3dfx_vt_fps_7),
 	S5KA3DFX_REGSET_TABLE_ELEMENT(1, s5ka3dfx_vt_fps_10),
 	S5KA3DFX_REGSET_TABLE_ELEMENT(2, s5ka3dfx_vt_fps_15),
+	S5KA3DFX_REGSET_TABLE_ELEMENT(3, s5ka3dfx_vt_fps_auto),
 };
 
 static struct s5ka3dfx_regset_table fps_table[] = {

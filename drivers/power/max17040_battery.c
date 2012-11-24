@@ -269,7 +269,7 @@ static void max17040_get_soc(struct i2c_client *client)
 
 	pure_soc = msb * 100 +  ((lsb*100)/256);
 	
-		adj_soc = ((pure_soc - 30)*10000)/9660; // (FGPureSOC-EMPTY(0.8))/(FULL-EMPTY(?))*100
+		adj_soc = ((pure_soc - 30)*10000)/9560; // (FGPureSOC-EMPTY(0.8))/(FULL-EMPTY(?))*100
 	
        soc=adj_soc/100;
 	

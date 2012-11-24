@@ -18,7 +18,7 @@
 
 *
 
-* This program is distributed Â¡Â°as isÂ¡Â± WITHOUT ANY WARRANTY of any
+* This program is distributed ¡°as is¡± WITHOUT ANY WARRANTY of any
 
 * kind, whether express or implied; without even the implied warranty
 
@@ -29,6 +29,7 @@
 *
 
 *****************************************************************************/
+
 #ifndef Common_Def_H
 #define Common_Def_H
 

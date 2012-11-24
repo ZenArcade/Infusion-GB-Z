@@ -4823,15 +4823,15 @@ enum driver_setup_t {DRIVER_SETUP_OK, DRIVER_SETUP_INCOMPLETE};
 #define DEBUG_DIAGNOSTIC_T37                      37u
 #define SPARE_T38                                 38u
 #define SPARE_T39                                 39u
-#define PROCI_GRIPSUPPRESSION_T40                 40u // for 244e
+#define PROCI_GRIPSUPPRESSION_T40                 40u // for 224e
 #define SPARE_T41                                 41u
-#define PROCI_TOUCHSUPPRESSION_T42                 42u // for 244e
+#define PROCI_TOUCHSUPPRESSION_T42                42u // for 224e
 #define SPARE_T43                                 43u
 #define SPARE_T44                                 44u
 #define SPARE_T45                                 45u
-#define SPT_CTECONFIG_T46                         46u // for 244e
-#define SPARE_T47                                 47u
-#define PROCG_NOISESUPPRESSION_T48                48u // for 244e
+#define SPT_CTECONFIG_T46                         46u // for 224e
+#define PROCI_STYLUS_T47                          47u // for 224e
+#define PROCG_NOISESUPPRESSION_T48                48u // for 224e
 #define SPARE_T49                                 49u
 #define SPARE_T50                                 50u
 /*
@@ -5029,6 +5029,7 @@ typedef struct
    uint8_t pwm;              /*!< Port pwm enable register    */
    uint8_t period;           /*!< PWM period (min-max) percentage*/
    uint8_t duty[4];          /*!< PWM duty cycles percentage */
+   uint8_t trigger[4];          
 
 }__packed spt_gpiopwm_t19_config_t;
 
@@ -5077,6 +5078,19 @@ typedef struct
 }__packed proci_touchsuppression_t42_config_t;
 
 
+// for 224e
+typedef struct
+{
+   uint8_t ctrl;
+   uint8_t contmin;
+   uint8_t contmax;
+   uint8_t stability;
+   uint8_t maxtcharea;   
+   uint8_t styshape;
+   uint8_t hoversup;
+   uint8_t confthr;
+   uint8_t syncsperx;
+}__packed proci_stylus_t47_config_t;
 
 typedef struct
 {
@@ -5182,13 +5196,14 @@ typedef struct
    uint8_t yorigin;           /*!< ACMASK LCMASK Object y start position on matrix  */
    uint8_t xsize;             /*!< ACMASK LCMASK Object x size (i.e. width)         */
    uint8_t ysize;             /*!< ACMASK LCMASK Object y size (i.e. height)        */
-   uint8_t reserved_for_future_aks_usage;
+   uint8_t reserved;
    /* Detection Configuration */
    uint8_t blen;               /*!< ACMASK Burst length for all object channels*/
-   uint16_t tchthr;             /*!< LCMASK Threshold    */
-   uint8_t tchdi;              /*!< Detect integration config           */
+   uint16_t fxddthr;             /*!< LCMASK Threshold    */
+   uint8_t fxddi;              /*!< Detect integration config           */
    uint8_t average;            /*!< LCMASK Sets the filter length on the prox signal */
-   uint16_t rate;               /*!< Sets the rate that prox signal must exceed */
+   uint16_t mvnullrate;               /*!< Sets the rate that prox signal must exceed */
+   uint16_t mvdthr;               /*!< Sets the rate that prox signal must exceed */
 
 }__packed touch_proximity_t23_config_t;
 
@@ -5425,10 +5440,11 @@ uint8_t write_keyarray_config(uint8_t key_array_number, touch_keyarray_t15_confi
 uint8_t write_linearization_config(uint8_t instance, proci_linearizationtable_t17_config_t cfg);
 uint8_t write_comc_config(uint8_t instance, spt_comcconfig_t18_config_t cfg);
 uint8_t write_gpio_config(uint8_t instance, spt_gpiopwm_t19_config_t cfg);
-uint8_t write_gripfacesuppression_config(uint8_t instance, proci_gripfacesuppression_t20_config_t cfg);// for 244
-uint8_t write_gripsuppression_config(uint8_t instance, proci_gripsuppression_t40_config_t cfg);// for 244e
-uint8_t write_touchsuppression_config(uint8_t instance, proci_touchsuppression_t42_config_t cfg);// for 244e
-uint8_t write_noisesuppression_e_config(uint8_t instance, procg_noisesuppression_t48_config_t cfg); // for 244e
+uint8_t write_gripfacesuppression_config(uint8_t instance, proci_gripfacesuppression_t20_config_t cfg);// for 224
+uint8_t write_gripsuppression_config(uint8_t instance, proci_gripsuppression_t40_config_t cfg);// for 224e
+uint8_t write_touchsuppression_config(uint8_t instance, proci_touchsuppression_t42_config_t cfg);// for 224e
+uint8_t write_stylus_config(uint8_t instance, proci_stylus_t47_config_t cfg);// for 224e
+uint8_t write_noisesuppression_e_config(uint8_t instance, procg_noisesuppression_t48_config_t cfg); // for 224e
 uint8_t write_noisesuppression_config(uint8_t instance, procg_noisesuppression_t22_config_t cfg);
 uint8_t write_proximity_config(uint8_t instance, touch_proximity_t23_config_t cfg);
 uint8_t write_onetouchgesture_config(uint8_t instance, proci_onetouchgestureprocessor_t24_config_t cfg);

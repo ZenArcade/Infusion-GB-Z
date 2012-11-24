@@ -261,7 +261,11 @@ static void s3c_set_chg_en(struct chg_data *chg, int enable);
 
 unsigned char maxim_chg_status();
 extern int FSA9480_Get_I2C_USB_Status(void);
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+extern void mxt224_ta_probe(int ta_status);
+#else
 extern int set_tsp_for_ta_detect(int state);
+#endif 
 
 #if defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD)
 static int is_camera_charging_on = 0;
@@ -1464,7 +1468,7 @@ err:   ;
 	else
 		{
 		chg->bat_info.charging_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		wake_unlock(&chg->vbus_wake_lock);
+		wake_lock_timeout(&chg->vbus_wake_lock, HZ / 5);
 		}
 	return ;
 
@@ -1529,7 +1533,20 @@ static void check_recharging_bat(struct chg_data *chg)
 		if (++count_check_recharging_bat >= 10) 
 		{
 			printk( "[BAT]%s: recharging , count_check_recharging_bat = %d\n", __func__, count_check_recharging_bat);
+
+			#if defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD)
+			if (chg->bat_info.event_dev_state & (OFFSET_CAMERA_ON | OFFSET_VIDEO_PLAY ))
+			{			
+				gpio_set_value(CAM_CHG_EN, 0);  //400mA
+				is_camera_charging_on = 1;
+			} else {
+				is_camera_charging_on = 0;
+				s3c_set_chg_en(chg,true);
+			}
+			#else
 			s3c_set_chg_en(chg,true);	
+			#endif
+			
 			chg->bat_info.batt_is_recharging = true;
 			count_check_recharging_bat = 0;
 		}
@@ -1592,12 +1609,10 @@ static void s3c_bat_charging_control(struct chg_data *chg)
 		
 		s3c_set_chg_en(chg,false);
 	}
-	
 	else if (chg->set_batt_full && (!chg->charging))
 		{
 			check_recharging_bat(chg);
 		}	
-		
 	else if(s3c_bat_is_full_charged(chg))
 	{
 		s3c_set_chg_en(chg, false);
@@ -1614,7 +1629,6 @@ static void s3c_bat_charging_control(struct chg_data *chg)
 		             	}
 		}
 #endif
-		
 	}
 	else if(chg->set_charge_timeout)    // Time over 
 	{
@@ -1649,7 +1663,6 @@ static void s3c_bat_charging_control(struct chg_data *chg)
 				(MAX8998_CHGEN_DISABLE	<< MAX8998_SHIFT_CHGEN));
 			
 				if (chg->discharging_time == 0) 
-//				else if (chg->discharging_time == 0) 
 				{
 				
 					ktime = alarm_get_elapsed_realtime();
@@ -1662,36 +1675,30 @@ static void s3c_bat_charging_control(struct chg_data *chg)
 			}
 
                  // MAX8922 control ON 
-                    gpio_set_value(CAM_CHG_EN, 0);  //400mA
+			gpio_set_value(CAM_CHG_EN, 0);
+			
                     is_camera_charging_on = 1;
 					charging_state = 1;	
 					
 		      chg->charging = charging_state;
 		      ce_for_fuelgauge = charging_state;
-				
-
-        	}
-        	else
-        	{
-        		s3c_set_chg_en(chg, true);
         	}	
      	
 	}
 	else if( !(chg->bat_info.event_dev_state  & (OFFSET_CAMERA_ON | OFFSET_VIDEO_PLAY )) && chg->charging )
 	{
              // Output LOW 5msec	
-		if(is_camera_charging_on)
-			{
 		        	gpio_set_value(CAM_CHG_EN, 1);
 		        	msleep(5);
 				is_camera_charging_on = 0;	
-				charging_state = 0;
-				s3c_set_chg_en(chg, true);
-			}
-		else
-		{
-			s3c_set_chg_en(chg, true);
-		}
+
+		max8998_write_reg(i2c, MAX8998_REG_CHGR2,
+				(chg->esafe		<< MAX8998_SHIFT_ESAFEOUT) |
+			         (MAX8998_CHGTIME_DISABLE	<< MAX8998_SHIFT_FT) |
+				  (MAX8998_CHGEN_ENABLE	<< MAX8998_SHIFT_CHGEN));
+
+		//charging_state = 0;
+		//s3c_set_chg_en(chg, true);
 	}
 #endif 
 	else
@@ -1722,7 +1729,7 @@ static unsigned int s3c_bat_check_v_f(struct chg_data *chg)
 	else
 	{
 		VF_count++;
-		if(VF_count == 1)
+		if(VF_count == 5)
 			{
 				printk("[BAT]:%s: Unauthorized battery!, V_F ADC = %d, VF_count = %d \n", __func__, adc,VF_count);
 
@@ -1840,6 +1847,75 @@ err:
 }
 #endif
 
+static void stepcharger_statemachine(struct chg_data *chg)
+{
+  struct i2c_client *i2c = chg->iodev->i2c;
+  u8 data = 0;
+  u8 ichg = 0;
+  u32 batt_voltage = 0;
+  int ret;
+
+  bat_dbg(" [BAT] Entered stepcharger state machine \n"); 
+  ret = max8998_read_reg(i2c,MAX8998_REG_CHGR1,&data);
+  ichg = (data & 0x7);
+
+  batt_voltage = chg->bat_info.batt_vcell/1000;
+
+  bat_dbg(" [BAT] ICHG was 0x%02x \n",ichg);
+  bat_dbg(" [BAT] Voltage was %d\n",batt_voltage);
+
+  if((ichg == 0x4) || (ichg == 0x3))
+    {
+       if(batt_voltage < 4100)
+	{
+	  bat_dbg(" [BAT] increase current to 600 mA\n ");
+	  data = (data & 0xF8) | 0x05;
+	  max8998_write_reg(i2c,MAX8998_REG_CHGR1,data);
+	}     
+    }
+  if(ichg == 0x5)
+    {
+      if(batt_voltage < 4050)
+	{
+	  bat_dbg(" [BAT] increase current to 700 mA\n ");
+	  data = (data & 0xF8) | 0x06;
+	  max8998_write_reg(i2c,MAX8998_REG_CHGR1,data);
+	}
+      if(batt_voltage > 4150)
+	{
+	  bat_dbg(" [BAT] decrease current to 550 mA\n ");
+	  data = (data & 0xF8) | 0x03;
+	  max8998_write_reg(i2c,MAX8998_REG_CHGR1,data);
+	}
+    }
+  if(ichg == 0x6)
+    {
+      if(batt_voltage < 4000)
+	{
+	  bat_dbg(" [BAT] increase current to 800 mA\n ");
+	  data = (data & 0xF8) | 0x07;
+	  max8998_write_reg(i2c,MAX8998_REG_CHGR1,data);
+	}
+      if(batt_voltage > 4100)
+	{
+	  bat_dbg(" [BAT] decrease current to 600 mA\n ");
+	  data = (data & 0xF8) | 0x05;
+	  max8998_write_reg(i2c,MAX8998_REG_CHGR1,data);
+	}
+    }
+  if(ichg == 0x7)
+    {
+      if(batt_voltage > 4050)
+	{
+	  bat_dbg(" [BAT] decrease current to 700 mA\n ");
+	  data = (data & 0xF8) | 0x06;
+	  max8998_write_reg(i2c,MAX8998_REG_CHGR1,data);
+	}
+    }
+
+
+}
+
 static void s3c_bat_work(struct work_struct *work)
 {
 	struct chg_data *chg = container_of(work, struct chg_data, bat_work);
@@ -1857,6 +1933,11 @@ static void s3c_bat_work(struct work_struct *work)
 
 	s3c_bat_discharge_reason(chg);
 	s3c_cable_check_status(chg);	
+		
+	if (chg->charging)
+	  {
+	    stepcharger_statemachine(chg);
+	  }
 	
 	if ( (  (chg->bat_info.batt_vcell/1000) >= FULL_CHARGE_COND_VOLTAGE)  && chg->charging)
 		{
@@ -2044,12 +2125,6 @@ static ssize_t s3c_bat_show_attrs(struct device *dev,
 		break;	
 #endif			
 
-#if (defined ATT_TMO_COMMON)
-	case BATT_CHG_CURRENT:
-	  chg->bat_info.batt_current = s3c_bat_get_adc_data(S3C_ADC_CHG_CURRENT);
-	  i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", chg->bat_info.batt_current);
-	  break;
-#endif
 		
 	case BATT_CHARGING_SOURCE:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", chg->cable_status);
@@ -2243,7 +2318,9 @@ static enum hrtimer_restart charger_timer_func(struct hrtimer *timer)
 	
 	return HRTIMER_NORESTART;
 }
-
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+bool is_cable_attached = 0;
+#endif
 void max8998_int_work_func(struct work_struct *work)
 {
 	int ret;
@@ -2261,8 +2338,11 @@ void max8998_int_work_func(struct work_struct *work)
 	if(maxim_chg_status())
 	  {
 			chg->lowbat_warning = false;
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+			is_cable_attached = 1;
+#else
 			set_tsp_for_ta_detect(1);
-			
+#endif			
 		 	if(chg->bat_info.batt_health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE) 
 			{
 				s3c_temp_control(chg,POWER_SUPPLY_HEALTH_GOOD);
@@ -2273,9 +2353,15 @@ void max8998_int_work_func(struct work_struct *work)
 	  else 
 	  {
 		  del_timer_sync(&chargingstep_timer);
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+		  is_cable_attached = 0;
+#else
 		  set_tsp_for_ta_detect(0);
+#endif 
 	  }
-
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
+	  mxt224_ta_probe(is_cable_attached);
+#endif
 	if(lpm_charging_mode)
 	{
 		usb_gadget_p->ops->vbus_session(usb_gadget_p, 0);
@@ -2283,7 +2369,7 @@ void max8998_int_work_func(struct work_struct *work)
 
 	if (chg->esafe == MAX8998_ESAFE_ALLOFF)
 		chg->esafe = MAX8998_USB_VBUS_AP_ON;
-	bat_dbg("%s : cable_status(%d) esafe(%d)\n", __func__, status, chg->esafe);	
+	bat_dbg("%s : cable_status(%d) esafe(%d)\n", __func__, UsbStatus, chg->esafe);	
 	
 	power_supply_changed(&chg->psy_ac);
 	power_supply_changed(&chg->psy_usb);
@@ -2482,6 +2568,9 @@ static __devinit int max8998_charger_probe(struct platform_device *pdev)
 			pr_err("[ERROR] Failed to enable vADC_regulator \n");
 			return err;
 	}
+#if defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD)
+	MAX8922_hw_init();
+#endif
 	
 #endif
 

@@ -1872,7 +1872,7 @@ void wm8994_record_main_mic(struct snd_soc_codec *codec)
 	val = wm8994_read(codec, WM8994_POWER_MANAGEMENT_1);
 //[GB - modified in Hawk
 	val &= ~(WM8994_BIAS_ENA_MASK | WM8994_VMID_SEL_MASK | WM8994_MICB1_ENA_MASK);
-	val |= (WM8994_BIAS_ENA | WM8994_VMID_SEL_NORMAL | WM8994_MICB1_ENA);  
+	val |= (WM8994_BIAS_ENA | WM8994_VMID_SEL_NORMAL);  
 //]GB - modified in Hawk
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1, val);
 
@@ -3206,7 +3206,7 @@ void wm8994_set_voicecall_receiver(struct snd_soc_codec *codec)
 			WM8994_MIXOUTRVOL_TO_HPOUT2);
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1,
 //[GB - modified in Hawk
-		WM8994_HPOUT2_ENA | WM8994_VMID_SEL_NORMAL | WM8994_BIAS_ENA | WM8994_MICB1_ENA);
+		WM8994_HPOUT2_ENA | WM8994_VMID_SEL_NORMAL | WM8994_BIAS_ENA);
 //]GB - modified in Hawk
 
 	wm8994_write(codec, WM8994_AIF1_DAC1_FILTERS_1, 0x0000);
@@ -3224,7 +3224,7 @@ void wm8994_set_voicecall_headset(struct snd_soc_codec *codec)
 
 	/* enable power in analog domain */
 //[GB - modified in Hawk
-	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1, 0x0303 | WM8994_MICB1_ENA);
+	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1, 0x0303);
 //]GB - modified in Hawk
 
 	wm8994_set_headset_common(codec, DCS_VOICE);
@@ -3380,7 +3380,7 @@ wm8994_set_headset_common(codec, DCS_VOICE);
 	wm8994_write(codec,WM8994_POWER_MANAGEMENT_4,
 			WM8994_AIF2ADCL_ENA | WM8994_AIF2ADCR_ENA | WM8994_ADCL_ENA);
 
-	wm8994_write(codec,WM8994_POWER_MANAGEMENT_1, 0x0303 | WM8994_MICB1_ENA);  
+	wm8994_write(codec,WM8994_POWER_MANAGEMENT_1, 0x0303);  
 	/*Analogue Output Configuration*/	
 	wm8994_write(codec,WM8994_OUTPUT_MIXER_1, 0x0001 );   
 	wm8994_write(codec,WM8994_OUTPUT_MIXER_2, 0x0001 );   
@@ -3483,7 +3483,7 @@ void wm8994_set_voicecall_speaker(struct snd_soc_codec *codec)
 
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1,
 //[GB - modified in Hawk
-		WM8994_SPKOUTL_ENA | WM8994_VMID_SEL_NORMAL | WM8994_BIAS_ENA | WM8994_MICB1_ENA);
+		WM8994_SPKOUTL_ENA | WM8994_VMID_SEL_NORMAL | WM8994_BIAS_ENA);
 //]GB - modified in Hawk
 
 	wm8994_set_codec_gain(codec, VOICECALL_MODE, VOICECALL_SPK);
@@ -3524,7 +3524,7 @@ void wm8994_set_voicecall_bluetooth(struct snd_soc_codec *codec)
 	val  = wm8994_read(codec, WM8994_POWER_MANAGEMENT_1);
 	val &= ~(WM8994_SPKOUTL_ENA_MASK | WM8994_HPOUT2_ENA_MASK |
 //[GB - modified in Hawk
-		WM8994_HPOUT1L_ENA_MASK | WM8994_HPOUT1R_ENA_MASK | WM8994_MICB1_ENA);
+		WM8994_HPOUT1L_ENA_MASK | WM8994_HPOUT1R_ENA_MASK);
 //]GB - modified in Hawk
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1, val);
 
@@ -4466,7 +4466,7 @@ void wm8994_set_voicecall_tty(struct snd_soc_codec *codec)
 
 	/* enable power in analog domain */
 //[GB - modified in Hawk
-	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1, 0x0303 | WM8994_MICB1_ENA);
+	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1, 0x0303);
 //]GB - modified in Hawk
 
 	wm8994_set_headset_common(codec, DCS_VOICE);
@@ -4665,7 +4665,7 @@ void wm8994_set_voicecall_hac(struct snd_soc_codec *codec)
 			WM8994_MIXOUTRVOL_TO_HPOUT2);
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_1,
 //[GB - modified in Hawk
-		WM8994_HPOUT2_ENA | WM8994_VMID_SEL_NORMAL | WM8994_BIAS_ENA | WM8994_MICB1_ENA);
+		WM8994_HPOUT2_ENA | WM8994_VMID_SEL_NORMAL | WM8994_BIAS_ENA);
 //]GB - modified in Hawk
 
 	wm8994_write(codec, WM8994_AIF1_DAC1_FILTERS_1, 0x0000);

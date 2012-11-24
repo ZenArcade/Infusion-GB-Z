@@ -84,13 +84,13 @@ static ssize_t keyshort_test(struct device *dev, struct device_attribute *attr, 
 	int count;
 //NAGSM_Android_SEL_Kernel_20110421
 #if defined (CONFIG_S5PC110_VIBRANTPLUS_BOARD) 
-	if(!gpio_get_value(GPIO_KBR0)||!gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER))
+	if(!gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER))
 #elif defined (CONFIG_S5PC110_HAWK_BOARD) /* nat */
 	if( !gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER) || !gpio_get_value(S5PV210_GPH3(0)))
-		
+#elif defined (CONFIG_S5PC110_KEPLER_BOARD)
+	if(!gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER))
 #elif defined CONFIG_S5PC110_DEMPSEY_BOARD
 		if( !gpio_get_value(GPIO_KBR0) || !gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_nPOWER))	
-
 #else
 	if(!gpio_get_value(GPIO_KBR1) || !gpio_get_value(GPIO_KBR2) || !gpio_get_value(GPIO_nPOWER)  || !gpio_get_value(S5PV210_GPH3(5)))
 #endif

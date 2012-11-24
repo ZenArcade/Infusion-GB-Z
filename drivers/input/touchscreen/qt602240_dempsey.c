@@ -143,6 +143,67 @@ static uint8_t cal_check_flag = 0u;
 static uint8_t palm_flag= 0u, not_yet_count = 0u ;
 #endif
 //static int CAL_THR = 10;
+
+void check_chip_calibration(unsigned char one_touch_input_flag);
+
+
+#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
+
+static struct regulator *tspvdd = NULL, *tspavdd = NULL;
+void init_hw_setting(void)
+{
+	int tint = GPIO_TOUCH_INT;
+	s3c_gpio_cfgpin(tint, S3C_GPIO_INPUT);
+	s3c_gpio_setpull(tint, S3C_GPIO_PULL_UP);
+
+#if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+	if (gpio_is_valid(GPIO_TOUCH_EN)) {
+		if (gpio_request(GPIO_TOUCH_EN, "GPG3"))
+			printk(KERN_DEBUG "Failed to request GPIO_TOUCH_EN!\n");
+		gpio_direction_output(GPIO_TOUCH_EN, 1);
+	}
+
+	s3c_gpio_setpull(GPIO_TOUCH_EN, S3C_GPIO_PULL_NONE); 
+	gpio_free(GPIO_TOUCH_EN);
+#else
+//dempsey
+
+	tspvdd = regulator_get(NULL, "tsp_vdd");
+        if (IS_ERR(tspvdd)) {
+                printk(KERN_ERR "%s: cant get TSP_VDD\n", __func__);
+		return;
+        }
+
+	tspavdd = regulator_get(NULL, "tsp_avdd");
+        if (IS_ERR(tspvdd)) {
+                printk(KERN_ERR "%s: cant get TSP_AVDD\n", __func__);
+		return;
+        }	
+
+	//regulator_disable(tspvdd);
+	//regulator_disable(tspavdd);
+
+
+	msleep(10);
+	regulator_enable(tspvdd);
+	regulator_enable(tspavdd);
+
+
+
+#endif 
+	printk(KERN_DEBUG "qt602240 GPIO Status\n");
+#ifndef CONFIG_S5PC110_DEMPSEY_BOARD
+	printk(KERN_DEBUG "TOUCH_EN  : %s\n", gpio_get_value(GPIO_TOUCH_EN)? "High":"Low");
+	printk(KERN_DEBUG "TOUCH_RST : %s\n", gpio_get_value(GPIO_TOUCH_RST)? "High":"Low");
+#endif
+//	printk("TOUCH_INT : %s\n", gpio_get_value(GPIO_TOUCH_INT_N)? "High":"Low");
+	printk(KERN_DEBUG "TOUCH_INT : %s\n", gpio_get_value(GPIO_TOUCH_INT)? "High":"Low");
+
+	msleep(100);
+}
+
+#endif
+
 #if defined (KEY_LED_CONTROL)
 
 static bool bLedOn = false;
@@ -311,6 +372,7 @@ proci_twotouchgestureprocessor_t27_config_t twotouch_gesture_config = {0};  //Tw
 // for 224e
 proci_gripsuppression_t40_config_t gripsuppression_config = {0};    //Grip suppression config.
 proci_touchsuppression_t42_config_t touchsuppression_config = {0};    //Touch suppression config.
+proci_stylus_t47_config_t stylus_config = {0};    //Stylus config.
 procg_noisesuppression_t48_config_t noise_suppression_e_config = {0};         //Noise suppression config.
 spt_cteconfig_t46_config_t cte_e_config = {0};                //Capacitive touch engine config.
 
@@ -441,8 +503,8 @@ void qt_Acquisition_Config_Init(void)
 	    acquisition_config.atchcalst = 10;
 	    acquisition_config.atchcalsthr = 7;
 		#else
-	    acquisition_config.atchcalst = 8;
-	    acquisition_config.atchcalsthr = 8;
+	    acquisition_config.atchcalst = 4;//8;
+	    acquisition_config.atchcalsthr = 30;//8;
 		#endif
 
 		acquisition_config.atchfrccalthr = 40;
@@ -543,7 +605,7 @@ void qt_Multitouchscreen_Init(void)
 		#ifdef _SUPPORT_TOUCH_AMPLITUDE_
 	    touchscreen_config.ctrl = 0x8B; // enable amplitude
 		#else
-	    touchscreen_config.ctrl = 143; // enable + message-enable
+	    touchscreen_config.ctrl = 139; //143; // enable + message-enable
 		#endif
 	    touchscreen_config.xorigin = 0;
 	    touchscreen_config.yorigin = 0;
@@ -764,6 +826,10 @@ void qt_Gpio_Pwm_Init(void)
     gpiopwm_config.duty[1] = 0;
     gpiopwm_config.duty[2] = 0;
     gpiopwm_config.duty[3] = 0;
+    gpiopwm_config.trigger[0] = 0;
+    gpiopwm_config.trigger[1] = 0;
+    gpiopwm_config.trigger[2] = 0;
+    gpiopwm_config.trigger[3] = 0;
 
     if (write_gpio_config(0, gpiopwm_config) != CFG_WRITE_OK)
     {
@@ -839,9 +905,9 @@ void qt_Grip_Suppression_Config_Init(void)
 void qt_Touch_Suppression_Config_Init(void)
 {
     touchsuppression_config.ctrl = 0;
-    touchsuppression_config.apprthr = 32;
-    touchsuppression_config.maxapprarea = 120;
-    touchsuppression_config.maxtcharea = 100;
+    touchsuppression_config.apprthr = 0; //32;
+    touchsuppression_config.maxapprarea = 0; //120;
+    touchsuppression_config.maxtcharea = 0; //100;
     touchsuppression_config.supstrength = 0;
 	touchsuppression_config.supextto = 0;
 	touchsuppression_config.maxnumtchs = 0;
@@ -857,7 +923,27 @@ void qt_Touch_Suppression_Config_Init(void)
     }
 }
 
+void qt_Stylus_Config_Init()
+{
+    stylus_config.ctrl = 0;
+    stylus_config.contmin = 0;//32;
+    stylus_config.contmax = 0;//120;
+    stylus_config.stability = 0;//100;
+    stylus_config.maxtcharea = 0;
+	stylus_config.styshape = 0;
+	stylus_config.hoversup = 0;
+	stylus_config.confthr = 0;
+	stylus_config.syncsperx = 0;
 
+    /* Write grip suppression config to chip. */
+    if (get_object_address(PROCI_STYLUS_T47, 0) != OBJECT_NOT_FOUND)
+    {
+        if (write_stylus_config(0, stylus_config) != CFG_WRITE_OK)
+        {
+            QT_printf("[TSP] Stylus Configuration Fail!!! , Line %d \n\r", __LINE__);
+        }
+    }
+}
 /*****************************************************************************
 *
 *  FUNCTION
@@ -921,7 +1007,7 @@ void qt_Noise_Suppression_E_Config_Init(void)
 {
 	noise_suppression_e_config.ctrl = 3;
 	noise_suppression_e_config.cfg = 12;
-	noise_suppression_e_config.calcfg = 80;
+	noise_suppression_e_config.calcfg = 0x40;//80;
 	noise_suppression_e_config.basefreq = 0;
 	noise_suppression_e_config.mffreq[0] = 0;
 	noise_suppression_e_config.mffreq[1] = 0;
@@ -975,7 +1061,7 @@ void qt_Noise_Suppression_E_Config_for_TA_Init(void)
 {
 	noise_suppression_e_config.ctrl = 1;
 	noise_suppression_e_config.cfg = 12;
-	noise_suppression_e_config.calcfg = 112;
+	noise_suppression_e_config.calcfg = 0x50;//112;
 	noise_suppression_e_config.basefreq = 0;
 	noise_suppression_e_config.mffreq[0] = 0;
 	noise_suppression_e_config.mffreq[1] = 0;
@@ -1038,14 +1124,16 @@ void qt_Proximity_Config_Init(void)
 {
     proximity_config.ctrl = 0;
     proximity_config.xorigin = 0;
+    proximity_config.yorigin = 0;
     proximity_config.xsize = 0;
     proximity_config.ysize = 0;
-    proximity_config.reserved_for_future_aks_usage = 0;
+    proximity_config.reserved = 0;
     proximity_config.blen = 0;
-    proximity_config.tchthr = 0;
-    proximity_config.tchdi = 0;
+    proximity_config.fxddthr = 0;
+    proximity_config.fxddi = 0;
     proximity_config.average = 0;
-    proximity_config.rate = 0;
+    proximity_config.mvnullrate = 0;
+    proximity_config.mvdthr = 0;
 
     if (get_object_address(TOUCH_PROXIMITY_T23, 0) != OBJECT_NOT_FOUND)
     {
@@ -1253,7 +1341,7 @@ uint8_t reset_chip(void)
     uint8_t data = 1u;
 
     dprintk("\n[TSP][%s] \n", __func__);
-   cal_check_flag = 1u; //20100309s
+//   cal_check_flag = 1u; //20100309s
     return(write_mem(command_processor_address + RESET_OFFSET, 1, &data));
 }
 
@@ -1272,8 +1360,13 @@ uint8_t calibrate_chip(void)
     uint8_t data = 1u;
     int ret = WRITE_MEM_OK;
     uint8_t atchcalst, atchcalsthr;
+    uint16_t object_address;
     
-    if((tsp_version>=0x16)&&(cal_check_flag == 0)) {     
+    
+    
+    if(cal_check_flag == 0) {     
+    	
+    	object_address = get_object_address(GEN_ACQUISITIONCONFIG_T8,0);
         /* change calibration suspend settings to zero until calibration confirmed good */
         /* store normal settings */
         atchcalst = acquisition_config.atchcalst;
@@ -1286,12 +1379,14 @@ uint8_t calibrate_chip(void)
         dprintk("[TSP] reset acq atchcalst=%d, atchcalsthr=%d\n", acquisition_config.atchcalst, acquisition_config.atchcalsthr );
 
         /* Write temporary acquisition config to chip. */
-        if (write_acquisition_config(acquisition_config) != CFG_WRITE_OK) {
-            /* "Acquisition config write failed!\n" */
-            dprintk("\n[TSP][ERROR] line : %d\n", __LINE__);
-            ret = WRITE_MEM_FAILED; /* calling function should retry calibration call */
-        }
+		ret = write_mem(object_address + 6, 1, &atchcalst);
+		ret = write_mem(object_address + 7, 1, &atchcalsthr);
 
+		if(info_block->info_id.family_id == MXT224E_FAMILYID)
+		{
+			ret = write_mem(object_address + 8, 1, &atchcalst);
+			ret = write_mem(object_address + 9, 1, &atchcalsthr);
+        }
         /* restore settings to the local structure so that when we confirm the 
         * cal is good we can correct them in the chip */
         /* this must be done before returning */
@@ -1690,6 +1785,13 @@ uint8_t write_touchsuppression_config(uint8_t instance, proci_touchsuppression_t
     return(write_simple_config(PROCI_TOUCHSUPPRESSION_T42, instance, (void *) &cfg));
 }
 
+//for 224e
+uint8_t write_stylus_config(uint8_t instance, proci_stylus_t47_config_t cfg)
+{
+
+    return(write_simple_config(PROCI_STYLUS_T47, instance, (void *) &cfg));
+}
+
 
 /*****************************************************************************
 *
@@ -1860,17 +1962,19 @@ uint8_t write_proximity_config(uint8_t instance, touch_proximity_t23_config_t cf
     *(tmp + 2) = cfg.yorigin;
     *(tmp + 3) = cfg.xsize;
     *(tmp + 4) = cfg.ysize;
-    *(tmp + 5) = cfg.reserved_for_future_aks_usage;
+    *(tmp + 5) = cfg.reserved;
     *(tmp + 6) = cfg.blen;
 
-    *(tmp + 7) = (uint8_t) (cfg.tchthr & 0x00FF);
-    *(tmp + 8) = (uint8_t) (cfg.tchthr >> 8);
+    *(tmp + 7) = (uint8_t) (cfg.fxddthr & 0x00FF);
+    *(tmp + 8) = (uint8_t) (cfg.fxddthr >> 8);
 
-    *(tmp + 9) = cfg.tchdi;
+    *(tmp + 9) = cfg.fxddi;
     *(tmp + 10) = cfg.average;
 
-    *(tmp + 11) = (uint8_t) (cfg.rate & 0x00FF);
-    *(tmp + 12) = (uint8_t) (cfg.rate >> 8);
+    *(tmp + 11) = (uint8_t) (cfg.mvnullrate & 0x00FF);
+    *(tmp + 12) = (uint8_t) (cfg.mvnullrate >> 8);
+    *(tmp + 13) = (uint8_t) (cfg.mvdthr & 0x00FF);
+    *(tmp + 14) = (uint8_t) (cfg.mvdthr >> 8);
 
     object_address = get_object_address(TOUCH_PROXIMITY_T23, instance);
 
@@ -2498,47 +2602,48 @@ void quantum_touch_probe(void)
 
 #ifdef OPTION_WRITE_CONFIG
 
-    qt_Power_Config_Init();
+    qt_Power_Config_Init();////
 
-    qt_Acquisition_Config_Init();
+    qt_Acquisition_Config_Init();////
 
-    qt_Multitouchscreen_Init();
+    qt_Multitouchscreen_Init();////
 
-    qt_KeyArray_Init();
+    qt_KeyArray_Init();////
 
-    qt_ComcConfig_Init();
+	qt_Proximity_Config_Init();////
+
+    qt_ComcConfig_Init();////
+
+	qt_Gpio_Pwm_Init();	////
+
+    qt_Selftest_Init();//
 
 
 		if(family_id == MXT224_FAMILYID)
 		{
-			qt_Gpio_Pwm_Init();	
-			qt_Proximity_Config_Init();
-			qt_Grip_Face_Suppression_Config_Init();
-			qt_Noise_Suppression_Config_Init();
-			qt_CTE_Config_Init();
+			qt_Grip_Face_Suppression_Config_Init();//
+			qt_Noise_Suppression_Config_Init();//
+    		qt_One_Touch_Gesture_Config_Init();//
+		    qt_Two_touch_Gesture_Config_Init();//
+			qt_CTE_Config_Init();//
+
 		}
 		else if(family_id == MXT224E_FAMILYID)
 		{
-			qt_Grip_Suppression_Config_Init();
-			qt_Noise_Suppression_E_Config_Init();
-			qt_Touch_Suppression_Config_Init();
-			qt_CTE_Config_E_Init();
+			qt_Grip_Suppression_Config_Init();////
+			qt_Touch_Suppression_Config_Init();////
+			qt_Stylus_Config_Init();////
+			qt_Noise_Suppression_E_Config_Init();////
+			qt_CTE_Config_E_Init();////
+
 		}
 
- 
-    qt_One_Touch_Gesture_Config_Init();
-
-    qt_Selftest_Init();
-
-    qt_Two_touch_Gesture_Config_Init();
-
- 
     /* Backup settings to NVM. */
     if (backup_config() != WRITE_MEM_OK) {
         dprintk("Failed to backup, exiting...\n\r");
         return;
     }
-	msleep(50);
+	msleep(100);
 
 #else
     dprintk("Chip setup sequence was bypassed!\n\r");
@@ -2554,19 +2659,22 @@ void quantum_touch_probe(void)
 	 palm_flag = 0;
 	 not_yet_count = 0;
 #endif
-        msleep(150);
+        msleep(100);
         dprintk("Chip reset OK!\n\r");
 
     }
 
+    calibrate_chip();
+
 }
 
-
+int cnt = 0; 
 void quantum_reconfig()
 {
     U8 family_id;
-
-	disable_irq(qt602240->client->irq);
+if(cnt == 0)
+{
+	printk("quantum_reconfig 1\n");
 
 	get_family_id(&family_id);
 
@@ -2628,7 +2736,25 @@ void quantum_reconfig()
 			dprintk("Chip reset OK!\n\r");
 		}
 
-		enable_irq(qt602240->client->irq);
+cnt++;
+}
+else{
+//	disable_irq(qt602240->client->irq);
+	printk("quantum_reconfig 2 \n");
+    regulator_disable(tspvdd);
+    regulator_disable(tspavdd);	
+	mdelay(10);
+
+	regulator_enable(tspvdd);
+	regulator_enable(tspavdd);
+	reset_chip();
+
+	mdelay(100);
+cnt = 0; 
+}
+
+//	enable_irq(qt602240->client->irq);	
+	printk("quantum_reconfig end\n");
 }
 
 
@@ -3062,7 +3188,8 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
     uint8_t j;
     uint8_t x_line_limit;
 
-    if(tsp_version >=0x16) {
+		if(info_block->info_id.family_id == MXT224E_FAMILYID)
+			cte_config.mode = cte_e_config.mode;
         /* we have had the first touchscreen or face suppression message 
          * after a calibration - check the sensor state and try to confirm if
          * cal was good or bad */
@@ -3211,7 +3338,7 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 
         }
     }
-}
+
 
 unsigned int touch_state_val=0;
 EXPORT_SYMBOL(touch_state_val);
@@ -3459,21 +3586,17 @@ int set_tsp_for_ta_detect_exec(int state)
 				return -1;
 			}
 
-			ret = get_object_info(mxt224e_data, TOUCH_MULTITOUCHSCREEN_T9, &t9_size, &t9_address);
-
-			if (ret) {
-				printk(KERN_ERR "[TSP] fail to get t9 object_info\n");
-				return -1;
-        }
-
 			/* CHRGON disable */
-			value = (u8)64;
+			value = (u8)80;
 			write_mem(t48_address+(u16)2, 1, &value);
 			//read_mem(object_address+(u16)object_register, (u8)size, &val);			
 
 			/* T48 config all wirte (TA) */	
 			qt_Noise_Suppression_E_Config_for_TA_Init();
 
+			/* CHRGON enable */
+			value = (noise_suppression_e_config.calcfg|0x20);
+			write_mem(t48_address+(u16)2, 1, &value);
 
 			/* Check T48 Register */
 			#if 0
@@ -3538,12 +3661,16 @@ int set_tsp_for_ta_detect_exec(int state)
 			}
 
 			/* CHRGON disable */
-			value = (u8)80;
+			value = (u8)64;
 			write_mem(t48_address+(u16)2, 1, &value);
 			//read_mem(object_address+(u16)object_register, (u8)size, &val);			
 
 			/* T48 config all wirte (BATT) */
 			qt_Noise_Suppression_E_Config_Init();
+
+			/* CHRGON disable */
+			value = (noise_suppression_e_config.calcfg|0x20);;
+			write_mem(t48_address+(u16)2, 1, &value);
 
 			/* Check T48 Register */
 			#if 0
@@ -3662,7 +3789,7 @@ void  get_message(void)
 
 	if(gpio_get_value(GPIO_TOUCH_INT))
 	{
-		printk("GPIO_TOUCH_INT is HIGH\n");
+		dprintk("GPIO_TOUCH_INT is HIGH\n");
 		return;
 	}
 
@@ -3780,6 +3907,8 @@ void  get_message(void)
 			  	if((quantum_msg[0] == 1) && ((quantum_msg[1] &0x08) == 0x08))
 			  	{
 			  		  quantum_reconfig();
+										  //	reset_chip();
+				TSP_forced_release_forOKkey();	
 			  	      printk(KERN_DEBUG "quantum_reconfig is called\n");
 
 			  	}
@@ -4434,62 +4563,6 @@ err:
 }
 
 
-#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-
-static struct regulator *tspvdd = NULL, *tspavdd = NULL;
-void init_hw_setting(void)
-{
-	int tint = GPIO_TOUCH_INT;
-	s3c_gpio_cfgpin(tint, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(tint, S3C_GPIO_PULL_UP);
-
-#if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-	if (gpio_is_valid(GPIO_TOUCH_EN)) {
-		if (gpio_request(GPIO_TOUCH_EN, "GPG3"))
-			printk(KERN_DEBUG "Failed to request GPIO_TOUCH_EN!\n");
-		gpio_direction_output(GPIO_TOUCH_EN, 1);
-	}
-
-	s3c_gpio_setpull(GPIO_TOUCH_EN, S3C_GPIO_PULL_NONE); 
-	gpio_free(GPIO_TOUCH_EN);
-#else
-//dempsey
-
-	tspvdd = regulator_get(NULL, "tsp_vdd");
-        if (IS_ERR(tspvdd)) {
-                printk(KERN_ERR "%s: cant get TSP_VDD\n", __func__);
-		return;
-        }
-
-	tspavdd = regulator_get(NULL, "tsp_avdd");
-        if (IS_ERR(tspvdd)) {
-                printk(KERN_ERR "%s: cant get TSP_AVDD\n", __func__);
-		return;
-        }	
-
-	//regulator_disable(tspvdd);
-	//regulator_disable(tspavdd);
-
-
-	msleep(10);
-	regulator_enable(tspvdd);
-	regulator_enable(tspavdd);
-
-
-
-#endif 
-	printk(KERN_DEBUG "qt602240 GPIO Status\n");
-#ifndef CONFIG_S5PC110_DEMPSEY_BOARD
-	printk(KERN_DEBUG "TOUCH_EN  : %s\n", gpio_get_value(GPIO_TOUCH_EN)? "High":"Low");
-	printk(KERN_DEBUG "TOUCH_RST : %s\n", gpio_get_value(GPIO_TOUCH_RST)? "High":"Low");
-#endif
-//	printk("TOUCH_INT : %s\n", gpio_get_value(GPIO_TOUCH_INT_N)? "High":"Low");
-	printk(KERN_DEBUG "TOUCH_INT : %s\n", gpio_get_value(GPIO_TOUCH_INT)? "High":"Low");
-
-	msleep(100);
-}
-
-#endif
 
 
 int qt602240_probe(struct i2c_client *client,
@@ -4783,7 +4856,6 @@ static void qt602240_early_suspend(struct early_suspend *h)
 	s3c_gpio_cfgpin(GPIO_TOUCH_INT, S3C_GPIO_INPUT);
 	s3c_gpio_setpull(GPIO_TOUCH_INT, S3C_GPIO_PULL_NONE);
 
-
 #endif
 
     LEAVE_FUNC;
@@ -4796,7 +4868,6 @@ static void qt602240_late_resume(struct early_suspend *h)
     ENTER_FUNC;
 #if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)
     gpio_set_value(GPIO_TOUCH_EN, 1);
-
 #endif
 //    msleep(70);
 //NAGSM_Android_SEL_Kernel_20110421
@@ -4829,11 +4900,16 @@ static void qt602240_late_resume(struct early_suspend *h)
 	
 	if ( need_to_change_sensitivity ) {
 		set_tsp_for_ta_detect_exec(status_ta_on_resume);
-
+		#if defined (USE_TS_TVOUT_35PI_DETECT_CHANGE_REG)
+		set_tsp_for_tvout_35pi_detect_exec(status_35pi_on_resume);
+		#endif
 		need_to_change_sensitivity = 0;
 	}
-#endif
+	else
+		  calibrate_chip();
+#else
     calibrate_chip();
+#endif
 
     enable_irq(qt602240->client->irq);
 
@@ -5546,13 +5622,9 @@ static ssize_t set_touchscreen_store(struct device *dev, struct device_attribute
         dprintk("[%s] CMD 27 , touchscreen_config.yedgedist     = %d\n", __func__, config_value );
         touchscreen_config.yedgedist     = config_value;
     } else if(cmd_no == 28) {
-        if(tsp_version >= 0x16) {
             dprintk("[%s] CMD 28 , touchscreen_config.jumplimit      = %d\n", __func__, config_value );
             touchscreen_config.jumplimit      = config_value;
         } else {
-            dprintk("[%s] CMD 28 , touchscreen_config.jumplimit  is not supported in this version.\n", __func__ );
-        }
-    } else  {
         dprintk("[%s] unknown CMD\n", __func__);
     }
 
@@ -5907,10 +5979,7 @@ static ssize_t set_write_show(struct device *dev, struct device_attribute *attr,
     dprintk("25 , touchscreen_config.xedgedist  = %d\n",touchscreen_config.xedgedist  );
     dprintk("26 , touchscreen_config.yedgectrl  = %d\n",touchscreen_config.yedgectrl   );
     dprintk("27 , touchscreen_config.yedgedist  = %d\n",touchscreen_config.yedgedist   );
-    if(tsp_version >= 0x16)
         dprintk("28 , touchscreen_config.jumplimit  = %d\n",touchscreen_config.jumplimit  );
-    else
-        dprintk("28 , touchscreen_config.jumplimit is not supported in this version.\n" );
 
     /* Write touchscreen (1st instance) config to chip. */
     if (write_multitouchscreen_config(0, touchscreen_config) != CFG_WRITE_OK) {

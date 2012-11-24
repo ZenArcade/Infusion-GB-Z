@@ -61,7 +61,7 @@ typedef struct os_string_descriptor_set os_string_descriptor_set;
  *#define CSY_MORE_DEBUG
  *#define CSY_DEBUG2
  */
-//#define CSY_DEBUG_ESS
+#define CSY_DEBUG_ESS
 
 #ifdef CSY_DEBUG
 #  ifdef CSY_MORE_DEBUG
