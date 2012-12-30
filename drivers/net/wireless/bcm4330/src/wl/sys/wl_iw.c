@@ -73,7 +73,8 @@ typedef const struct si_pub  si_t;
 #ifndef IW_AUTH_KEY_MGMT_CCKM
 #define IW_AUTH_KEY_MGMT_CCKM	0x10
 #endif
-#define DOT11_LEAP_AUTH		0x80	/* LEAP authentication frame payload constants */
+
+#define DOT11_LEAP_AUTH		0x80	/* LEAP authentication frame payload constants */
 #endif /* BCMCCX */
 
 #define WL_IW_USE_ISCAN  1
@@ -7480,88 +7481,131 @@ wl_iw_get_ciq_counters(
 
 #endif
 
-#ifdef BCMCCX
-static int
-wl_iw_get_cckm_rn(
+#ifdef ROAM_API
+static int wl_iw_set_roam_trigger(
 	struct net_device *dev,
 	struct iw_request_info *info,
 	union iwreq_data *wrqu,
-	char *extra
-)
+	char *extra)
 {
-	int error, rn;
+	int error=0;
+	int roam_trigger[2];
+	char *p = extra;
 
-	WL_TRACE(("%s: wl_iw_get_cckm_rn\n", dev->name));
+	sscanf(extra, "%*s %d", &roam_trigger[0]);
+	WL_TRACE(("set roam_trigger= %d",roam_trigger[0]));
+	roam_trigger[1] = WLC_BAND_ALL;
 
-	if ((error = dev_wlc_intvar_get(dev, "cckm_rn", &rn)))
-	{
+	if ((error = dev_wlc_ioctl(dev, WLC_SET_ROAM_TRIGGER, roam_trigger, sizeof(roam_trigger))))
 		return error;
-	}
-	memcpy(extra, &rn, sizeof(u32));
-	wrqu->data.length = sizeof(u32);
+
+	p += snprintf(p, MAX_WX_STRING, "OK");
+	wrqu->data.length = p - extra + 1;
 
 	return 0;
 }
 
-static int
-wl_iw_set_cckm_krk(
+static int wl_iw_get_roam_trigger(
 	struct net_device *dev,
 	struct iw_request_info *info,
 	union iwreq_data *wrqu,
-	char *extra
-)
+	char *extra)
 {
-	int error;
-	u8 key[16];
+	int error = 0;
+	int roam_trigger[2] = {0, 0};
+	char *p = extra;
 
-	WL_TRACE(("%s: wl_iw_set_cckm_krk\n", dev->name));
-	memcpy(key, extra+strlen("set cckm_krk")+1, 16);
+	roam_trigger[1] = WLC_BAND_2G;
+	error = dev_wlc_ioctl(dev, WLC_GET_ROAM_TRIGGER, roam_trigger, sizeof(roam_trigger));
+	if (error) {
+		roam_trigger[1] = WLC_BAND_5G;
+		error = dev_wlc_ioctl(dev, WLC_GET_ROAM_TRIGGER, roam_trigger, sizeof(roam_trigger));
+	}
+	p += snprintf(p, MAX_WX_STRING, "GETROAMTRIGGER %d", roam_trigger[0]);
+	wrqu->data.length = p - extra + 1;
 
-	if ((error = dev_wlc_bufvar_set(dev, "cckm_krk", key, sizeof(key))))
-		return error;
-
-	return 0;
+	return error;
 }
-static int
-wl_iw_get_assoc_res_ies(
+
+static int wl_iw_set_roam_delta(
 	struct net_device *dev,
 	struct iw_request_info *info,
 	union iwreq_data *wrqu,
-	char *extra
-)
+	char *extra)
 {
-	int error;
-	u8 buf[256];
-	wl_assoc_info_t assoc_info;
-	u32 resp_ies_len = 0;
+	int error=0;
+	int roam_delta[2];
+	char *p = extra;
 
-	WL_TRACE(("%s: wl_iw_get_assoc_res_ies\n", dev->name));
-	if ((error = dev_wlc_bufvar_get(dev, "assoc_info", buf, sizeof(buf))))
+	sscanf(extra, "%*s %d", &roam_delta[0]);
+	WL_TRACE(("wl_iw_set_roam_delta= %d",roam_delta[0]));
+	roam_delta[1] = WLC_BAND_ALL;
+	if ((error = dev_wlc_ioctl(dev, WLC_SET_ROAM_DELTA, roam_delta, sizeof(roam_delta))))
 		return error;
 
-	memcpy(&assoc_info, buf, sizeof(wl_assoc_info_t));
-	assoc_info.req_len = htod32(assoc_info.req_len);
-	assoc_info.resp_len = htod32(assoc_info.resp_len);
-	assoc_info.flags = htod32(assoc_info.flags);
-
-	if (assoc_info.resp_len) {
-		resp_ies_len = assoc_info.resp_len - sizeof(struct dot11_assoc_resp);
-	}
-	/* first 4 bytes are ie len */
-	memcpy(extra, &resp_ies_len, sizeof(u32));
-	wrqu->data.length = sizeof(u32);
-
-	/* get the association resp IE's if there are any */
-	if (resp_ies_len) {
-		if ((error = dev_wlc_bufvar_get(dev, "assoc_resp_ies", buf, sizeof(buf))))
-			return error;
-		memcpy(extra+sizeof(u32), buf, resp_ies_len);
-		wrqu->data.length += resp_ies_len;
-	}
+	p += snprintf(p, MAX_WX_STRING, "OK");
+	wrqu->data.length = p - extra + 1;
 
 	return 0;
 }
-#endif /* BCMCCX */
+
+static int wl_iw_get_roam_delta(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	union iwreq_data *wrqu,
+	char *extra)
+{
+	int error = 0;
+	int roam_delta[2] = {0, 0};
+	char *p = extra;
+
+	roam_delta[1] = WLC_BAND_2G;
+	error = dev_wlc_ioctl(dev, WLC_GET_ROAM_DELTA, roam_delta, sizeof(roam_delta));
+	if (error) {
+		roam_delta[1] = WLC_BAND_5G;
+		error = dev_wlc_ioctl(dev, WLC_GET_ROAM_DELTA, roam_delta, sizeof(roam_delta));
+	}
+	p += snprintf(p, MAX_WX_STRING, "GETROAMDELTA %d", roam_delta[0]);
+	wrqu->data.length = p - extra + 1;
+	return error;
+}
+static int wl_iw_set_roam_scan_period(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	union iwreq_data *wrqu,
+	char *extra)
+{
+	int error=0;
+	int roam_scan_period = 0;
+	char *p = extra;
+
+	sscanf(extra, "%*s %d", &roam_scan_period);
+
+	if ((error = dev_wlc_ioctl(dev, WLC_SET_ROAM_SCAN_PERIOD, &roam_scan_period, sizeof(roam_scan_period))))
+		return error;
+	p += snprintf(p, MAX_WX_STRING, "OK");
+	wrqu->data.length = p - extra + 1;
+
+	return 0;
+}
+
+static int wl_iw_get_roam_scan_period(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	union iwreq_data *wrqu,
+	char *extra)
+{
+	int error = 0;
+	char *p = extra;
+	int roam_scan_period = 0;
+
+	error = dev_wlc_ioctl(dev, WLC_GET_ROAM_SCAN_PERIOD, &roam_scan_period, sizeof(roam_scan_period));
+	p += snprintf(p, MAX_WX_STRING, "GETROAMDELTA %d", roam_scan_period);
+	wrqu->data.length = p - extra + 1;
+
+	return error;
+}
+#endif
 
 static int
 wl_iw_set_priv(
@@ -7664,6 +7708,20 @@ wl_iw_set_priv(
 			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
 		else if (strnicmp(extra, "GETPOWER", strlen("GETPOWER")) == 0)
 			ret = wl_iw_get_power_mode(dev, info, (union iwreq_data *)dwrq, extra);
+#ifdef ROAM_API
+	    else if (strnicmp(extra, "SETROAMTRIGGER", strlen("SETROAMTRIGGER")) == 0)
+		    ret = wl_iw_set_roam_trigger(dev, info, (union iwreq_data *)dwrq, extra);
+	    else if (strnicmp(extra, "GETROAMTRIGGER", strlen("GETROAMTRIGGER")) == 0)
+		    ret = wl_iw_get_roam_trigger(dev, info, (union iwreq_data *)dwrq, extra);
+	    else if (strnicmp(extra, "SETROAMDELTA", strlen("SETROAMDELTA")) == 0)
+		    ret = wl_iw_set_roam_delta(dev, info, (union iwreq_data *)dwrq, extra);
+	    else if (strnicmp(extra, "GETROAMDELTA", strlen("GETROAMDELTA")) == 0)
+		    ret = wl_iw_get_roam_delta(dev, info, (union iwreq_data *)dwrq, extra);
+	    else if (strnicmp(extra, "SETROAMSCANPERIOD", strlen("SETROAMSCANPERIOD")) == 0)
+		    ret = wl_iw_set_roam_scan_period(dev, info, (union iwreq_data *)dwrq, extra);
+	    else if (strnicmp(extra, "GETROAMSCANPERIOD", strlen("GETROAMSCANPERIOD")) == 0)
+		    ret = wl_iw_get_roam_scan_period(dev, info, (union iwreq_data *)dwrq, extra);
+#endif
 #endif
 	    /* Lin - Google put it here */
 #ifdef SOFTAP
@@ -7679,7 +7737,8 @@ wl_iw_set_priv(
 #ifdef CIQ_SUPPORT
 		else if (strnicmp(extra, "COUNTERS", strlen("COUNTERS")) == 0) 
 			ret = wl_iw_get_ciq_counters(dev, info, (union iwreq_data *)dwrq, extra);
-#endif#ifdef BCMCCX
+#endif
+#ifdef BCMCCX
 	    else if (strnicmp(extra, "get cckm_rn", strlen("get cckm_rn")) == 0)
 			ret = wl_iw_get_cckm_rn(dev, info, (union iwreq_data *)dwrq, extra);
 	    else if (strnicmp(extra, "set cckm_krk", strlen("set cckm_krk")) == 0)

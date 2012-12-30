@@ -1,5 +1,5 @@
 #!/bin/sh
-export KBUILD_BUILD_VERSION="Fusion-Z-S12"
+export KBUILD_BUILD_VERSION="Synthesis-Z-S12"
 cp -rf ./Core-Stock/* ./
 mkdir -p kernel/usr/initramfs
 rm -rf kernel/usr/initramfs/*

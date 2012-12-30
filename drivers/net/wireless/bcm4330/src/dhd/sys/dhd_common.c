@@ -1080,7 +1080,8 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 		        (uchar)event->addr.octet[5]&0xff);
 		DHD_ERROR(("Junlim WLC_E_ADDTS_IND %s: status %d, reason %d\n",
 		           eabuf, status, reason));
-	}	break;
+	}
+	break;
 	case WLC_E_DELTS_IND: {
 		uint reason;
 		char eabuf[ETHER_ADDR_STR_LEN];

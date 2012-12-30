@@ -586,12 +586,12 @@ static int dhd_sleep_pm_callback(struct notifier_block *nfb, unsigned long actio
 		case PM_HIBERNATION_PREPARE:
 		case PM_SUSPEND_PREPARE:
 			dhd_mmc_suspend = TRUE;
-		ret = NOTIFY_OK;
+			ret = NOTIFY_OK;
 		break;
 		case PM_POST_HIBERNATION:
 		case PM_POST_SUSPEND:
 			dhd_mmc_suspend = FALSE;
-		ret = NOTIFY_OK;
+			ret = NOTIFY_OK;
 		break;
 	}
 	smp_mb();
@@ -1380,6 +1380,7 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 	int k;
 #endif
 	char *dump_data;
+	uint16 protocol;
 #endif
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
@@ -1425,23 +1426,33 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 
 #ifdef DHD_RX_DUMP
 		dump_data = skb->data;
+		protocol = (dump_data[12] << 8) | dump_data[13];
+		DHD_ERROR(("RX DUMP - %s\n", _get_packet_type_str(protocol)));
 #ifdef DHD_RX_FULL_DUMP
-		for(k=0; k<skb->len; k++) {
-			DHD_ERROR(("%02X ", dump_data[k]));
-			if ((k&15) == 15) DHD_ERROR(("\n"));
+		if (protocol != ETHER_TYPE_BRCM) {
+			for(k=0; k<skb->len; k++) {
+				DHD_ERROR(("%02X ", dump_data[k]));
+				if ((k&15) == 15) DHD_ERROR(("\n"));
+			}
+			DHD_ERROR(("\n"));
 		}
-		DHD_ERROR(("\n"));
 #endif
-		if (dump_data[0] == 0xFF) {
-			DHD_ERROR(("%s: BROADCAST\n", __FUNCTION__));
+		if (protocol != ETHER_TYPE_BRCM) {
+			if (dump_data[0] == 0xFF) {
+				DHD_ERROR(("%s: BROADCAST\n", __FUNCTION__));
 
-			if ((dump_data[12] == 8) && (dump_data[13] == 6)) {
-				DHD_ERROR(("%s: ARP %d\n", __FUNCTION__, dump_data[0x15]));
+				if ((dump_data[12] == 8) && (dump_data[13] == 6)) {
+					DHD_ERROR(("%s: ARP %d\n", __FUNCTION__, dump_data[0x15]));
+				}
+			}
+			else if (dump_data[0] & 1) 
+				DHD_ERROR(("%s: MULTICAST: %02X:%02X:%02X:%02X:%02X:%02X\n", 
+					__FUNCTION__, dump_data[0], dump_data[1], dump_data[2], dump_data[3], dump_data[4], dump_data[5]));
+
+			if (protocol == ETHER_TYPE_802_1X) {
+				DHD_ERROR(("ETHER_TYPE_802_1X: ver %d, type %d, replay %d\n", dump_data[14], dump_data[15], dump_data[30]));
 			}
 		}
-		else if (dump_data[0] & 1) 
-			DHD_ERROR(("%s: MULTICAST: %02X:%02X:%02X:%02X:%02X:%02X\n", 
-				__FUNCTION__, dump_data[0], dump_data[1], dump_data[2], dump_data[3], dump_data[4], dump_data[5]));
 
 #endif
 		ifp = dhd->iflist[ifidx];

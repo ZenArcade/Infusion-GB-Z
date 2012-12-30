@@ -5830,6 +5830,8 @@ static const u8 *mxt224e_config[] = {
 };
 
 
+
+
 static struct mxt224_platform_data mxt224_data = {
 	.max_finger_touches = MXT224_MAX_MT_FINGERS,
 	.gpio_read_done =  S5PV210_GPJ0(5),

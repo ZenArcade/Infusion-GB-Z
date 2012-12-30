@@ -556,10 +556,8 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	uint32 glom = 0;
 	uint bcn_timeout = 12;
 	int arpoe = 1;
-	int arp_ol = 0xf;#ifndef BCMCCX	
-	int scan_assoc_time = 40;
-	int scan_unassoc_time = 80;#endif	
-	int assoc_retry = 7;
+	int arp_ol = 0xf;	int scan_assoc_time = 40;
+	int scan_unassoc_time = 80;	int assoc_retry = 3;
 	char buf[256];
 #ifdef AP
 	uint32 apsta = 1; /* Enable APSTA mode */
@@ -681,7 +679,8 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #endif
 #ifdef USE_FW_TRACE
 	setbit(eventmask, WLC_E_TRACE);
-#endif#if defined(BCMCCX) && defined(BCMDBG_EVENT)
+#endif
+#if defined(BCMCCX) && defined(BCMDBG_EVENT)
 	setbit(eventmask, WLC_E_ADDTS_IND);
 	setbit(eventmask, WLC_E_DELTS_IND);
 #endif /* defined(BCMCCX) && (BCMDBG_EVENT) */
@@ -692,7 +691,8 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_SCAN_CHANNEL_TIME, (char *)&scan_assoc_time,
 		sizeof(scan_assoc_time), TRUE, 0);
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_SCAN_UNASSOC_TIME, (char *)&scan_unassoc_time,
-		sizeof(scan_unassoc_time), TRUE, 0);#endif	
+		sizeof(scan_unassoc_time), TRUE, 0);
+#endif	
 
 	/* Set ARP offload */
 	bcm_mkiovar("arpoe", (char *)&arpoe, 4, iovbuf, sizeof(iovbuf));
@@ -704,7 +704,8 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 
 #if defined(USE_KEEP_ALIVE)
-	ret = dhd_enable_keepalive(dhd, 60000); /* 60 sec */
+	DHD_ERROR(("%s: KEEP Alive time is 45s \n", __FUNCTION__));
+	ret = dhd_enable_keepalive(dhd, 45000); /* 45 sec */
 	if (ret) {
 		DHD_ERROR(("%s: Keepalive setting failure, error=%d\n", __FUNCTION__, ret));
 		ret = 0; // For MFG mode
