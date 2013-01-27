@@ -2,7 +2,7 @@
  * BT-AMP support routines
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * 
+ *
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -48,9 +48,8 @@
 
 #include <dhd_bta.h>
 
-#ifdef WLBTAMP_HIGH_ONLY
-#include <wlc_bta.h>
-#endif
+static void dhd_bta_hcidump_cmd(dhd_pub_t *pub, amp_hci_cmd_t *cmd);
+
 
 #ifdef SEND_HCI_CMD_VIA_IOCTL
 #define BTA_HCI_CMD_MAX_LEN HCI_CMD_PREAMBLE_SIZE + HCI_CMD_DATA_SIZE
@@ -69,15 +68,14 @@ dhd_bta_docmd(dhd_pub_t *pub, void *cmd_buf, uint cmd_len)
 
 	if ((uint)cmd->plen + HCI_CMD_PREAMBLE_SIZE > cmd_len)
 		return BCME_BADLEN;
-#ifdef WLBTAMP_HIGH_ONLY
-	 status = _wlc_bta_docmd(pub->bta, cmd_buf, cmd_len);
-	 if (status != BCME_UNFINISHED)
-		 return status;
-#endif
 
 	len = bcm_mkiovar("HCI_cmd",
 		(char *)cmd, (uint)cmd->plen + HCI_CMD_PREAMBLE_SIZE, (char *)buf, len);
 
+#ifdef BCMDBG
+	if (DHD_BTA_ON())
+		dhd_bta_hcidump_cmd(pub, cmd);
+#endif
 
 	memset(&ioc, 0, sizeof(ioc));
 
@@ -89,6 +87,7 @@ dhd_bta_docmd(dhd_pub_t *pub, void *cmd_buf, uint cmd_len)
 	return dhd_wl_ioctl(pub, &ioc, ioc.buf, ioc.len);
 }
 #else /* !SEND_HCI_CMD_VIA_IOCTL */
+
 static void
 dhd_bta_flush_hcidata(dhd_pub_t *pub, uint16 llh)
 {
@@ -163,113 +162,12 @@ _dhd_bta_docmd(dhd_pub_t *pub, amp_hci_cmd_t *cmd)
 {
 	int status = 0;
 
-	DHD_BTA(("%s: cmd->opcode=0x%04x\n", __FUNCTION__, ltoh16_ua((uint8 *)&cmd->opcode)));
-
 	switch (ltoh16_ua((uint8 *)&cmd->opcode)) {
 	case HCI_Enhanced_Flush: {
 		eflush_cmd_parms_t *cmdparms = (eflush_cmd_parms_t *)cmd->parms;
 		dhd_bta_flush_hcidata(pub, ltoh16_ua(cmdparms->llh));
 		break;
 	}
-
-#if 1 ///leejay
-	case HCI_Read_Failed_Contact_Counter:
-		DHD_BTA(("[[HCI_Read_Failed_Contact_Counter]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Reset_Failed_Contact_Counter:
-		DHD_BTA(("[[HCI_Reset_Failed_Contact_Counter]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Link_Quality:
-		DHD_BTA(("[[HCI_Read_Link_Quality]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Local_AMP_Info:
-		DHD_BTA(("[[HCI_Read_Local_AMP_Info]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Local_AMP_ASSOC:
-		DHD_BTA(("[[HCI_Read_Local_AMP_ASSOC]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Remote_AMP_ASSOC:
-		DHD_BTA(("[[HCI_Write_Remote_AMP_ASSOC]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Create_Physical_Link:
-		DHD_BTA(("[[HCI_Create_Physical_Link]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Accept_Physical_Link_Request:
-		DHD_BTA(("[[HCI_Accept_Physical_Link_Request]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Disconnect_Physical_Link:
-		DHD_BTA(("[[HCI_Disconnect_Physical_Link]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Create_Logical_Link:
-		DHD_BTA(("[[HCI_Create_Logical_Link]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Accept_Logical_Link:
-		DHD_BTA(("[[HCI_Accept_Logical_Link]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Disconnect_Logical_Link:
-		DHD_BTA(("[[HCI_Disconnect_Logical_Link]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Logical_Link_Cancel:
-		DHD_BTA(("[[HCI_Logical_Link_Cancel]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Flow_Spec_Modify:
-		DHD_BTA(("[[HCI_Flow_Spec_Modify]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Flow_Control_Mode:
-		DHD_BTA(("[[HCI_Write_Flow_Control_Mode]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Best_Effort_Flush_Timeout:
-		DHD_BTA(("[[HCI_Read_Best_Effort_Flush_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Best_Effort_Flush_Timeout:
-		DHD_BTA(("[[HCI_Write_Best_Effort_Flush_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Short_Range_Mode:
-		DHD_BTA(("[[HCI_Read_Failed_Contact_Counter]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Reset:
-		DHD_BTA(("[[HCI_Reset]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Connection_Accept_Timeout:
-		DHD_BTA(("[[HCI_Read_Connection_Accept_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Connection_Accept_Timeout:
-		DHD_BTA(("[[HCI_Write_Connection_Accept_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Link_Supervision_Timeout:
-		DHD_BTA(("[[HCI_Read_Link_Supervision_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Link_Supervision_Timeout:
-		DHD_BTA(("[[HCI_Write_Link_Supervision_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Logical_Link_Accept_Timeout:
-		DHD_BTA(("[[HCI_Read_Logical_Link_Accept_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Logical_Link_Accept_Timeout:
-		DHD_BTA(("[[HCI_Write_Logical_Link_Accept_Timeout]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Set_Event_Mask_Page_2:
-		DHD_BTA(("[[HCI_Set_Event_Mask_Page_2]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Location_Data_Command:
-		DHD_BTA(("[[HCI_Read_Location_Data_Command]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Write_Location_Data_Command:
-		DHD_BTA(("[[HCI_Write_Location_Data_Command]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Local_Version_Info:
-		DHD_BTA(("[[HCI_Read_Local_Version_Info]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Local_Supported_Commands:
-		DHD_BTA(("[[HCI_Read_Local_Supported_Commands]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Buffer_Size:
-		DHD_BTA(("[[HCI_Read_Buffer_Size]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-	case HCI_Read_Data_Block_Size:
-		DHD_BTA(("[[HCI_Read_Data_Block_Size]] : 0x%04x\n", ltoh16_ua((uint8 *)&cmd->opcode)));
-		break;
-#endif
 	default:
 		break;
 	}
@@ -300,12 +198,15 @@ dhd_bta_docmd(dhd_pub_t *pub, void *cmd_buf, uint cmd_len)
 		/* return BCME_BADLEN; */
 	}
 
-
 	p = PKTGET(osh, pub->hdrlen + RFC1042_HDR_LEN + len, TRUE);
 	if (p == NULL) {
 		DHD_ERROR(("dhd_bta_docmd: out of memory\n"));
 		return BCME_NOMEM;
 	}
+
+#ifdef DHD_BTAMP_DBG
+	dhd_bta_hcidump_cmd(pub, cmd);
+#endif
 
 	/* intercept and handle the HCI cmd locally */
 	if ((status = _dhd_bta_docmd(pub, cmd)) > 0)
@@ -313,12 +214,6 @@ dhd_bta_docmd(dhd_pub_t *pub, void *cmd_buf, uint cmd_len)
 	else if (status < 0)
 		return status;
 
-#ifdef WLBTAMP_HIGH_ONLY
-	 status = _wlc_bta_docmd(pub->bta, cmd_buf, cmd_len);
-	/* Check if it's been handled in DHD */
-	 if (status != BCME_UNFINISHED)
-		 return status;
-#endif
 	/* copy in HCI cmd */
 	PKTPULL(osh, p, pub->hdrlen + RFC1042_HDR_LEN);
 	bcopy(cmd, PKTDATA(osh, p), len);
@@ -425,54 +320,13 @@ dhd_bta_tx_hcidata_complete(dhd_pub_t *dhdp, void *txp, bool success)
 	dhd_sendup_event_common(dhdp, &event, data);
 }
 
-#ifdef WLBTAMP_HIGH_ONLY
-static void
-dhd_bta_phy_link_complete(struct bta_info *bta, uint8 plh)
-{
-	uint8 status;
-	int plidx;
-
-	status = wlc_bta_pllookup(bta, plh, &plidx);
-	if (status == HCI_SUCCESS)
-	{
-		bta->pl[plidx].flags |= BTA_PL_COMPLETE;
-		bta->numpls++;
-	} else
-		DHD_ERROR(("%s: Unknown plh %d\n", __FUNCTION__, plh));
-}
-#endif /* WLBTAMP_HIGH_ONLY */
-
 /* event callback */
 void
 dhd_bta_doevt(dhd_pub_t *pub, void *data_buf, uint data_len)
 {
 	amp_hci_event_t *evt = (amp_hci_event_t *)data_buf;
 
-	DHD_BTA(("%s: evt->ecode = 0x%02x\n", __FUNCTION__, evt->ecode));
-
 	switch (evt->ecode) {
-#ifdef WLBTAMP_HIGH_ONLY
-	case HCI_Channel_Select: {
-		chanspec_select_evt_t *chsp_evt = (chanspec_select_evt_t *)evt;
-		chanspec_t chsp;
-
-		chsp = ltoh16_ua(&chsp_evt->chanspec);
-		DHD_BTA(("%s: pub->%x, plidx %d, selected chanspec %x, numpls %d\n",
-			__FUNCTION__, pub, chsp_evt->plidx, chsp, chsp_evt->numpls));
-		wlc_bta_cs_cb((struct bta_info *)pub, chsp_evt->plidx, chsp, chsp_evt->numpls);
-		evt->plen = 1;
-		break;
-	}
-	case HCI_Physical_Link_Complete: {
-		phy_link_evt_parms_t *pl_evt = (phy_link_evt_parms_t *)evt->parms;
-
-		DHD_BTA(("%s: HCI_Physical_Link_Complete: status %d, plh %d\n",
-			__FUNCTION__, pl_evt->status, pl_evt->plh));
-		if (pl_evt->status == HCI_SUCCESS)
-			dhd_bta_phy_link_complete((struct bta_info *)pub, pl_evt->plh);
-		break;
-	}
-#endif /* WLBTAMP_HIGH_ONLY */
 	case HCI_Command_Complete: {
 		cmd_complete_parms_t *parms = (cmd_complete_parms_t *)evt->parms;
 		switch (ltoh16_ua((uint8 *)&parms->opcode)) {
@@ -485,6 +339,7 @@ dhd_bta_doevt(dhd_pub_t *pub, void *data_buf, uint data_len)
 		}
 		break;
 	}
+
 	case HCI_Flush_Occurred: {
 		flush_occurred_evt_parms_t *evt_parms = (flush_occurred_evt_parms_t *)evt->parms;
 		dhd_bta_flush_hcidata(pub, ltoh16_ua((uint8 *)&evt_parms->handle));
@@ -493,4 +348,126 @@ dhd_bta_doevt(dhd_pub_t *pub, void *data_buf, uint data_len)
 	default:
 		break;
 	}
+}
+
+static const struct {
+	uint16 opval;
+	char *opstr;
+} op_map[] = {
+	{ HCI_Read_Logical_Link_Accept_Timeout, "Read Logical Link Accept Timeout" },
+	{ HCI_Write_Logical_Link_Accept_Timeout, "Write Logical Link Accept Timeout" },
+	{ HCI_Set_Event_Mask_Page_2, "Set Event Mask Page 2" },
+	{ HCI_Read_Location_Data_Command, "Read Location Data Command" },
+	{ HCI_Write_Location_Data_Command, "Write Location Data Command" },
+	{ HCI_Read_Buffer_Size, "Read Buffer Size" },
+	{ HCI_Read_Data_Block_Size, "Read Data Block Size" },
+	{ HCI_Reset, "Reset" },
+	{ HCI_Enhanced_Flush, "Enhanced Flush" },
+	{ HCI_Read_Best_Effort_Flush_Timeout, "Read Best Effort Flush Timeout" },
+	{ HCI_Write_Best_Effort_Flush_Timeout, "Write Best Effort Flush Timeout" },
+	{ HCI_Read_Connection_Accept_Timeout, "Read Connection Accept Timeout" },
+	{ HCI_Write_Connection_Accept_Timeout, "Write Connection Accept Timeout" },
+	{ HCI_Read_Link_Supervision_Timeout, "Read Link Supervision Timeout" },
+	{ HCI_Write_Link_Supervision_Timeout, "Write Link Supervision Timeout" },
+	{ HCI_Read_Link_Quality, "Read Link Quality" },
+	{ HCI_Read_Local_AMP_Info, "Read Local AMP Info" },
+	{ HCI_Read_Local_AMP_ASSOC, "Read Local AMP ASSOC" },
+	{ HCI_Write_Remote_AMP_ASSOC, "Write Remote AMP ASSOC" },
+	{ HCI_Create_Physical_Link, "Create Physical Link" },
+	{ HCI_Accept_Physical_Link_Request, "Accept Physical Link Request" },
+	{ HCI_Disconnect_Physical_Link, "Disconnect Physical Link" },
+	{ HCI_Create_Logical_Link, "Create Logical Link" },
+	{ HCI_Accept_Logical_Link, "Accept Logical Link" },
+	{ HCI_Disconnect_Logical_Link, "Disconnect Logical Link" },
+	{ HCI_Logical_Link_Cancel, "Logical Link Cancel" },
+	{ HCI_Flow_Spec_Modify, "Flow Spec Modify" },
+	{ HCI_Short_Range_Mode, "Short Range Mode" },
+	{ HCI_Read_Local_Version_Info, "Read Local Version Info" },
+	{ HCI_Read_Local_Supported_Commands, "Read Local Supported Commands" },
+	{ HCI_Read_Failed_Contact_Counter, "Read Failed Contact Counter" },
+	{ HCI_Reset_Failed_Contact_Counter, "Reset Failed Contact Counter" }
+};
+
+static char *
+op2str(uint16 op, char *buf)
+{
+	uint i;
+
+	sprintf(buf, "Unknown");
+	for (i = 0; i < ARRAYSIZE(op_map); i++) {
+		if (op == op_map[i].opval) {
+			sprintf(buf, op_map[i].opstr);
+		}
+	}
+
+	return buf;
+}
+
+static void
+dhd_bta_hcidump_cmd(dhd_pub_t *pub, amp_hci_cmd_t *cmd)
+{
+	uint16 op = cmd->opcode;
+	char buf[40];
+
+	DHD_ERROR(("dhd: < HCI Command: %s(0x%x|0x%x) plen %d\n",
+	         op2str(op, buf), HCI_CMD_OGF(op), HCI_CMD_OCF(op),
+	         cmd->plen));
+	prhex(NULL, cmd->parms, cmd->plen);
+	DHD_ERROR(("\n"));
+}
+
+void
+dhd_bta_hcidump_ACL_data(dhd_pub_t *pub, amp_hci_ACL_data_t *ACL_data, bool tx)
+{
+
+	DHD_BTA(("dhd: %s ACL data: handle 0x%04x flags 0x%02x dlen %d\n",
+	         tx ? "<" : ">", HCI_ACL_DATA_HANDLE(ACL_data->handle),
+	         HCI_ACL_DATA_FLAGS(ACL_data->handle), ACL_data->dlen));
+	prhex(NULL, ACL_data->data, ACL_data->dlen);
+	DHD_BTA(("\n"));
+}
+
+static const struct {
+	uint8 evtval;
+	char *evtstr;
+} evt_map[] = {
+	{ HCI_Command_Complete, "Command Complete" },
+	{ HCI_Command_Status, "Command Status" },
+	{ HCI_Flush_Occurred, "Flush Occurred" },
+	{ HCI_Enhanced_Flush_Complete, "Enhanced Flush Complete" },
+	{ HCI_Physical_Link_Complete, "Physical Link Complete" },
+	{ HCI_Channel_Select, "Channel Select" },
+	{ HCI_Disconnect_Physical_Link_Complete, "Disconnect Physical Link Complete" },
+	{ HCI_Logical_Link_Complete, "Logical Link Complete" },
+	{ HCI_Disconnect_Logical_Link_Complete, "Disconnect Logical Link Complete" },
+	{ HCI_Flow_Spec_Modify_Complete, "Flow Spec Modify Complete" },
+	{ HCI_Number_of_Completed_Data_Blocks, "Number of Completed Data Blocks" },
+	{ HCI_Short_Range_Mode_Change_Complete, "Short Range Mode Change Complete" },
+	{ HCI_Vendor_Specific, "Vendor Specific" }
+};
+
+static char *
+evt2str(uint8 evt, char *buf)
+{
+	uint i;
+
+	sprintf(buf, "Unknown");
+	for (i = 0; i < ARRAYSIZE(evt_map); i++) {
+		if (evt == evt_map[i].evtval) {
+			sprintf(buf, evt_map[i].evtstr);
+		}
+	}
+
+	return buf;
+}
+
+void
+dhd_bta_hcidump_evt(dhd_pub_t *pub, amp_hci_event_t *event)
+{
+	char buf[34];
+
+	DHD_ERROR(("dhd: > HCI Event: %s(0x%x) plen %d\n",
+	         evt2str(event->ecode, buf), event->ecode, event->plen));
+	prhex(NULL, event->parms, event->plen);
+	DHD_ERROR(("\n"));
 }

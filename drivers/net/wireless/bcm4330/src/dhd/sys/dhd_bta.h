@@ -2,7 +2,7 @@
  * BT-AMP support routines
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * 
+ *
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -35,5 +35,10 @@ extern void dhd_bta_doevt(struct dhd_pub *pub, void *data_buf, uint data_len);
 extern int dhd_bta_tx_hcidata(struct dhd_pub *pub, void *data_buf, uint data_len);
 extern void dhd_bta_tx_hcidata_complete(struct dhd_pub *dhdp, void *txp, bool success);
 
+struct amp_hci_event;
+struct amp_hci_ACL_data;
 
+extern void dhd_bta_hcidump_evt(struct dhd_pub *pub, struct amp_hci_event *event);
+extern void dhd_bta_hcidump_ACL_data(struct dhd_pub *pub, struct amp_hci_ACL_data *ACL_data,
+                                     bool tx);
 #endif /* __dhd_bta_h__ */

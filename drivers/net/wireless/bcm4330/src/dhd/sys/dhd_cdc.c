@@ -502,12 +502,12 @@ dhd_prot_dstats(dhd_pub_t *dhd)
 int
 dhd_enable_keepalive(dhd_pub_t *dhd, uint32 period)
 {
-	int buf_len;
-	int str_len = 10;
+	int	buf_len;
+	int	str_len = 10;
 	char buf[256];
 
 	wl_keep_alive_pkt_t keep_alive_pkt;
-	wl_keep_alive_pkt_t *pkt;
+	wl_keep_alive_pkt_t	*pkt;
 
 	memset(buf, 0, sizeof(buf));
 	
@@ -516,14 +516,25 @@ dhd_enable_keepalive(dhd_pub_t *dhd, uint32 period)
 
 	pkt = (wl_keep_alive_pkt_t *) (buf + str_len + 1);
 	keep_alive_pkt.period_msec = period;
-	keep_alive_pkt.len_bytes = 0;
-	buf_len = str_len + 1 + sizeof(wl_keep_alive_pkt_t);
-	memcpy((char *)pkt, &keep_alive_pkt, WL_KEEP_ALIVE_FIXED_LEN);
+	buf_len = str_len + 1;
 
 	if (0 == period) {
+		keep_alive_pkt.len_bytes = 0;
+		buf_len += sizeof(wl_keep_alive_pkt_t);
 		DHD_TRACE(("Disable Keep Alive\n"));
+		memcpy((char *)pkt, &keep_alive_pkt, WL_KEEP_ALIVE_FIXED_LEN);
 	}
 	else {
+		uint8 contents[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0};
+
+		keep_alive_pkt.len_bytes = 16;
+		memcpy((char *)pkt, &keep_alive_pkt, WL_KEEP_ALIVE_FIXED_LEN);
+
+		bcopy(contents, pkt->data, sizeof(contents));
+		/* source address */
+		bcopy(&dhd->mac, &pkt->data[6], 6);
+
+		buf_len += (WL_KEEP_ALIVE_FIXED_LEN + keep_alive_pkt.len_bytes);
 		DHD_TRACE(("Enable Keep Alive\n"));
 	}
 
@@ -547,10 +558,17 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	char eventmask[WL_EVENTING_MASK_LEN];
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 
-	uint up = 0;#ifdef BCMCCX
+	uint up = 0;#ifdef ROAM_ENABLE
 	uint roamvar = 0;
-#else	
+	int roam_trigger[2] = {-75, WLC_BAND_ALL};
+	int roam_scan_period[2] = {10, WLC_BAND_ALL};
+	int roam_delta[2] = {10, WLC_BAND_ALL};
+	int roam_fullscan_period = 120;
+#else
 	uint roamvar = 1;#endif
+#ifdef OKC_SUPPORT
+	uint32 okc = 1;
+#endif
 	uint power_mode = PM_FAST;
 	uint32 dongle_align = DHD_SDALIGN;
 	uint32 glom = 0;
@@ -559,9 +577,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	int arp_ol = 0xf;	int scan_assoc_time = 40;
 	int scan_unassoc_time = 80;	int assoc_retry = 3;
 	char buf[256];
-#ifdef AP
+#ifdef USE_WIFI_DIRECT
 	uint32 apsta = 1; /* Enable APSTA mode */
-	uint32 mpc = 0; /* Turn MPC off for AP/APSTA mode */
+	uint32 plcp = 0;
 #endif
 
 	/* query for 'ver' to get version info from firmware */
@@ -594,9 +612,22 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #ifdef SOFTAP
 	}
 #endif /* SOFTAP */
-#ifdef BCMCCX
-	if(roamvar)
-		DHD_ERROR((" roam_off =%d BCMCCX roam_off should be 0\n",roamvar));
+
+	/* Disable built-in roaming to allowed ext supplicant to take care of roaming */
+	bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+
+#ifdef ROAM_ENABLE
+	dhdcdc_set_ioctl(dhd, 0, WLC_SET_ROAM_TRIGGER, roam_trigger, sizeof(roam_trigger), 1);
+	dhdcdc_set_ioctl(dhd, 0, WLC_SET_ROAM_SCAN_PERIOD, roam_scan_period, sizeof(roam_scan_period), 1);
+	dhdcdc_set_ioctl(dhd, 0, WLC_SET_ROAM_DELTA, roam_delta, sizeof(roam_delta), 1);
+	bcm_mkiovar("fullroamperiod", (char *)&roam_fullscan_period, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+#endif
+
+#ifdef OKC_SUPPORT
+	bcm_mkiovar("okc_enable", (char *)&okc, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 #endif
 
 #ifdef CONFIG_CONTROL_PM
@@ -627,19 +658,12 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	bcm_mkiovar("bcn_timeout", (char *)&bcn_timeout, 4, iovbuf, sizeof(iovbuf));
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 
-	/* Disable built-in roaming to allowed ext supplicant to take care of roaming */
-	bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, sizeof(iovbuf));
-	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-
-#ifdef AP
-	/* Turn off MPC in AP mode */
-	bcm_mkiovar("mpc", (char *)&mpc, 4, iovbuf, sizeof(iovbuf));
-	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);	
+#ifdef USE_WIFI_DIRECT
 	/* Enable APSTA mode */
 	bcm_mkiovar("apsta", (char *)&apsta, 4, iovbuf, sizeof(iovbuf));
-	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);	
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 #endif
-	
+
 	/* Force STA UP */
 	ret = dhd_wl_ioctl_cmd(dhd, WLC_UP, (char *)&up, sizeof(up), TRUE, 0);
 	if (ret < 0)
@@ -668,7 +692,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	setbit(eventmask, WLC_E_NDIS_LINK);
 	setbit(eventmask, WLC_E_MIC_ERROR);
 	setbit(eventmask, WLC_E_PMKID_CACHE);
-	setbit(eventmask, WLC_E_TXFAIL);
+//	setbit(eventmask, WLC_E_TXFAIL);
 	setbit(eventmask, WLC_E_JOIN_START);
 	setbit(eventmask, WLC_E_SCAN_COMPLETE);
 #ifdef CIQ_SUPPORT
@@ -680,19 +704,14 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #ifdef USE_FW_TRACE
 	setbit(eventmask, WLC_E_TRACE);
 #endif
-#if defined(BCMCCX) && defined(BCMDBG_EVENT)
-	setbit(eventmask, WLC_E_ADDTS_IND);
-	setbit(eventmask, WLC_E_DELTS_IND);
-#endif /* defined(BCMCCX) && (BCMDBG_EVENT) */
 
 	bcm_mkiovar("event_msgs", eventmask, WL_EVENTING_MASK_LEN, iovbuf, sizeof(iovbuf));
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-#ifndef BCMCCX
+
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_SCAN_CHANNEL_TIME, (char *)&scan_assoc_time,
 		sizeof(scan_assoc_time), TRUE, 0);
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_SCAN_UNASSOC_TIME, (char *)&scan_unassoc_time,
 		sizeof(scan_unassoc_time), TRUE, 0);
-#endif	
 
 	/* Set ARP offload */
 	bcm_mkiovar("arpoe", (char *)&arpoe, 4, iovbuf, sizeof(iovbuf));
@@ -708,8 +727,13 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	ret = dhd_enable_keepalive(dhd, 45000); /* 45 sec */
 	if (ret) {
 		DHD_ERROR(("%s: Keepalive setting failure, error=%d\n", __FUNCTION__, ret));
-		ret = 0; // For MFG mode
+		/* For MFG mode */
+		ret = 0;
 	}
+#endif
+
+#ifdef USE_WIFI_DIRECT
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_PLCPHDR, &plcp, 4, TRUE, 0);
 #endif
 
 done:
@@ -750,6 +774,8 @@ dhd_prot_stop(dhd_pub_t *dhd)
 
 dhd_pub_t *dhd_get_pub(struct net_device *dev); /* dhd_linux.c */
 
+void dhd_set_packet_filter(int value, dhd_pub_t *dhd);
+
 int dhd_deepsleep(struct net_device *dev, int flag) 
 {
 	char iovbuf[20];
@@ -762,6 +788,9 @@ int dhd_deepsleep(struct net_device *dev, int flag)
 			DHD_ERROR(("[WiFi] Deepsleep On\n"));
 			/* give some time to _dhd_sysioc_thread() before deepsleep */
 			msleep(200);
+			if (dhd_pkt_filter_enable && !ap_fw_loaded) {
+				dhd_set_packet_filter(0, dhdp);
+			}
 			/* Disable MPC */
 			powervar = 0;
 			bcm_mkiovar("mpc", (char *)&powervar, 4, iovbuf, sizeof(iovbuf));

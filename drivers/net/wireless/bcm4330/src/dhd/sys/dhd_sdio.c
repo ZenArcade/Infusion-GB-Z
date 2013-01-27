@@ -1107,7 +1107,13 @@ dhd_bus_txdata(struct dhd_bus *bus, void *pkt)
 	int ret = BCME_ERROR;
 	osl_t *osh;
 	uint datalen, prec;
-
+#ifdef DHD_TX_DUMP
+	uint8 *dump_data;
+	uint16 protocol;
+#ifdef DHD_TX_FULL_DUMP
+	int i;
+#endif
+#endif
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
 	osh = bus->dhd->osh;
@@ -1126,6 +1132,25 @@ dhd_bus_txdata(struct dhd_bus *bus, void *pkt)
 		datalen += SDPCM_TEST_HDRLEN;
 	}
 #endif /* SDTEST */
+#ifdef DHD_TX_DUMP
+	dump_data = PKTDATA(osh, pkt);
+	dump_data += 4; /* skip 4 bytes header */
+	protocol = (dump_data[12] << 8) | dump_data[13];
+#ifdef DHD_TX_FULL_DUMP
+	DHD_ERROR(("TX DUMP\n"));
+
+	for(i=0; i<datalen-4; i++) {
+		DHD_ERROR(("%02X ", dump_data[i]));
+		if ((i&15) == 15) printk("\n");
+	}
+	DHD_ERROR(("\n"));
+
+#endif
+	if (protocol == ETHER_TYPE_802_1X) {
+		DHD_ERROR(("ETHER_TYPE_802_1X: ver %d, type %d, replay %d\n", dump_data[14], dump_data[15], dump_data[30]));
+	}
+#endif
+
 
 	/* Add space for the header */
 	PKTPUSH(osh, pkt, SDPCM_HDRLEN);
@@ -2942,6 +2967,10 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 
 	if (enforce_mutex)
 		dhd_os_sdlock(bus->dhd);
+#if defined(SDIO_ISR_THREAD) || defined(HW_OOB)
+	/* Change our idea of bus state */
+	bus->dhd->busstate = DHD_BUS_DOWN;
+#endif
 
 	BUS_WAKE(bus);
 
@@ -2952,10 +2981,10 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 	W_SDREG(0, &bus->regs->hostintmask, retries);
 	local_hostintmask = bus->hostintmask;
 	bus->hostintmask = 0;
-
+#if defined(OOB_INTR_ONLY) && !defined(HW_OOB)
 	/* Change our idea of bus state */
 	bus->dhd->busstate = DHD_BUS_DOWN;
-
+#endif
 	/* Force clocks on backplane to be sure F2 interrupt propagates */
 	saveclk = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
 	if (!err) {
@@ -5618,6 +5647,23 @@ dhdsdio_release(dhd_bus_t *bus, osl_t *osh)
 	if (bus) {
 		ASSERT(osh);
 
+#if defined(SDIO_ISR_THREAD) || defined(HW_OOB)
+		if (bus->dhd) {
+			dhd_common_deinit(bus->dhd);
+			dongle_isolation = bus->dhd->dongle_isolation;
+			dhd_detach(bus->dhd);
+		}
+
+		/* De-register interrupt handler */
+		bcmsdh_intr_disable(bus->sdh);
+		bcmsdh_intr_dereg(bus->sdh);
+
+		if (bus->dhd) {
+			dhdsdio_release_dongle(bus, osh, dongle_isolation);
+			dhd_free(bus->dhd);
+			bus->dhd = NULL;
+		}
+#else
 		/* De-register interrupt handler */
 		bcmsdh_intr_disable(bus->sdh);
 		bcmsdh_intr_dereg(bus->sdh);
@@ -5630,7 +5676,7 @@ dhdsdio_release(dhd_bus_t *bus, osl_t *osh)
 			dhd_free(bus->dhd);
 			bus->dhd = NULL;
 		}
-
+#endif
 		dhdsdio_release_malloc(bus, osh);
 
 
@@ -5900,6 +5946,11 @@ dhdsdio_download_nvram(struct dhd_bus *bus)
 	bool nvram_file_exists;
 
 	nv_path = bus->nv_path;
+
+	DHD_ERROR(("%s: firmware image path = %s\n",
+           __FUNCTION__, bus->fw_path));
+	DHD_ERROR(("%s: nvram vars file path = %s\n",
+           __FUNCTION__, bus->nv_path));
 
 	nvram_file_exists = ((nv_path != NULL) && (nv_path[0] != '\0'));
 	if (!nvram_file_exists && (bus->nvram_params == NULL))

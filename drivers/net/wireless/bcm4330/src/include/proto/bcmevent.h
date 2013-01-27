@@ -297,6 +297,10 @@ typedef struct wl_event_data_if {
 #define WLC_E_IF_ROLE_WDS		2	/* WDS link */
 #define WLC_E_IF_ROLE_P2P_GO		3	/* P2P Group Owner */
 #define WLC_E_IF_ROLE_P2P_CLIENT	4	/* P2P Client */
+#ifdef WLBTAMP
+#define WLC_E_IF_ROLE_BTA_CREATOR	5	/* BT-AMP Creator */
+#define WLC_E_IF_ROLE_BTA_ACCEPTOR	6	/* BT-AMP Acceptor */
+#endif
 
 /* Reason codes for LINK */
 #define WLC_E_LINK_BCN_LOSS	1	/* Link down because of beacon loss */

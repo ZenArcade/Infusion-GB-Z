@@ -4,6 +4,7 @@
 
 #include <proto/ethernet.h>
 #include <dngl_stats.h>
+#include <bcmutils.h>
 #include <dhd.h>
 #include <dhd_dbg.h>
 
@@ -335,61 +336,6 @@ int CheckRDWR_Macaddr(	struct dhd_info *dhd, dhd_pub_t *dhdp, struct ether_addr 
 
 #endif
 
-#ifdef CONFIG_CONTROL_PM
-#include <bcmutils.h>
-extern bool g_PMcontrol;
-void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
-{
-	struct file *fp = NULL;
-	char *filepath = "/data/.psm.info";
-	mm_segment_t oldfs = {0};
-	char power_val = 0;
-	char iovbuf[WL_EVENTING_MASK_LEN + 12];
-	
-	g_PMcontrol = FALSE;
-
-	fp = filp_open(filepath, O_RDONLY, 0);
-	if (IS_ERR(fp)) {
-		/* Enable PowerSave Mode */
-		dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode, sizeof(uint), TRUE, 0);
-
-		fp = filp_open(filepath, O_RDWR | O_CREAT, 0666);
-		if (IS_ERR(fp) || (fp==NULL)) {
-			DHD_ERROR(("[%s, %d] /data/.psm.info open failed\n", __FUNCTION__, __LINE__));
-		}
-		else {
-			oldfs = get_fs();
-			set_fs(get_ds());
-
-			if (fp->f_mode & FMODE_WRITE) {
-				power_val = '1';
-				fp->f_op->write(fp, (const char *)&power_val, sizeof(char), &fp->f_pos);
-			}
-			set_fs(oldfs);
-		}
-	}
-	else {
-		kernel_read(fp, fp->f_pos, &power_val, 1);
-		DHD_ERROR(("POWER_VAL = %c \r\n" , power_val));
-
-		if(power_val == '0') {
-			*power_mode = PM_OFF;	
-			/* Disable PowerSave Mode */
-			dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode, sizeof(uint), TRUE, 0);
-			/* Turn off MPC in AP mode */
-			bcm_mkiovar("mpc", (char *)power_mode, 4, iovbuf, sizeof(iovbuf));
-			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-			g_PMcontrol = TRUE;
-		} else {
-			dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode, sizeof(uint), TRUE, 0);
-		}
-	}
-
-	if(fp)
-		filp_close(fp, NULL);
-}
-#endif
-
 #ifdef USE_CID_CHECK
 
 static int write_cid_file(const char *filepath, const char *buf, int buf_len)
@@ -439,7 +385,9 @@ int check_module_cid(dhd_pub_t *dhd)
 {
 	int ret = -1;
 	unsigned char cis_buf[128] = {0};
+	unsigned char cid_buf[10] = {0};
 	const char* cidfilepath = "/data/.cid.info";
+	int nread;
 
 	/* Try reading out from CIS */
 	cis_rw_t *cish = (cis_rw_t *)&cis_buf[8];
@@ -447,11 +395,15 @@ int check_module_cid(dhd_pub_t *dhd)
 
 	fp_cid = filp_open(cidfilepath, O_RDONLY, 0);
 	if (!IS_ERR(fp_cid)) { 
+		kernel_read(fp_cid, fp_cid->f_pos, &cid_buf, sizeof(cid_buf)); 
+		if(strstr(cid_buf,"samsung")||strstr(cid_buf,"murata")) {
 		/* file does exist, just return */
 		filp_close(fp_cid, NULL);
 		return 0;
 	}
 
+		DHD_ERROR(("[WIFI].cid.info file already exists but it contains an unknown id [%s]\n", cid_buf));
+	}
 	cish->source = 0;
 	cish->byteoff = 0;
 	cish->nbytes = sizeof(cis_buf);
@@ -469,7 +421,7 @@ int check_module_cid(dhd_pub_t *dhd)
 			DHD_ERROR(("CID MATCH FOUND\n"));
 			write_cid_file(cidfilepath, "murata", 6);
 		} else {
-			DHD_ERROR(("CID MISMATCH 0x02X 0x02X 0x02X 0x02X\n", 
+			DHD_ERROR(("CID MISMATCH 0x%02X 0x%02X 0x%02X 0x%02X\n", 
 				cis_buf[CIS_CID_OFFSET], cis_buf[CIS_CID_OFFSET+1], 
 				cis_buf[CIS_CID_OFFSET+2], cis_buf[CIS_CID_OFFSET+3]));
 			write_cid_file(cidfilepath, "samsung", 7);
@@ -477,5 +429,119 @@ int check_module_cid(dhd_pub_t *dhd)
 	}
 
 	return ret;
+}
+#endif
+
+#ifdef WRITE_MACADDR
+int Write_Macaddr(struct ether_addr *mac)
+{
+	char* filepath			= "/data/.mac.info";
+	struct file *fp_mac	= NULL;
+	char buf[18]			= {0};
+	mm_segment_t oldfs		= {0};
+	int ret = -1;
+	int retry_count = 0;
+
+startwrite:
+	
+	sprintf(buf,"%02X:%02X:%02X:%02X:%02X:%02X\n",
+			mac->octet[0],mac->octet[1],mac->octet[2],
+			mac->octet[3],mac->octet[4],mac->octet[5]);
+
+	fp_mac = filp_open(filepath, O_RDWR | O_CREAT, 0666); // File is always created.
+
+	if(IS_ERR(fp_mac)) {
+		DHD_ERROR(("[WIFI] %s: File open error\n", filepath));
+		return -1;
+	}
+	else {
+		oldfs = get_fs();
+		set_fs(get_ds());
+		
+		if(fp_mac->f_mode & FMODE_WRITE) {
+			ret = fp_mac->f_op->write(fp_mac, (const char *)buf, sizeof(buf), &fp_mac->f_pos);
+			if(ret < 0)
+				DHD_ERROR(("[WIFI] Mac address [%s] Failed to write into File: %s\n", buf, filepath));
+			else
+				DHD_INFO(("[WIFI] Mac address [%s] written into File: %s\n", buf, filepath));
+		}       
+		set_fs(oldfs);
+		filp_close(fp_mac, NULL);
+	}
+	/* check .mac.info file is 0 byte */
+	fp_mac = filp_open(filepath, O_RDONLY, 0);
+	ret = kernel_read(fp_mac, 0, buf, 18);
+
+	if((ret == 0) && (retry_count++ < 3)){
+		filp_close(fp_mac, NULL);
+		goto startwrite;
+	}	
+	
+	filp_close(fp_mac, NULL);
+
+	return 0;
+	
+}
+#endif
+
+#ifdef CONFIG_CONTROL_PM
+extern bool g_PMcontrol;
+void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
+{
+	struct file *fp = NULL;
+	char *filepath = "/data/.psm.info";
+	mm_segment_t oldfs = {0};
+	char power_val = 0;
+	char iovbuf[WL_EVENTING_MASK_LEN + 12];
+	
+	g_PMcontrol = FALSE;
+
+	fp = filp_open(filepath, O_RDONLY, 0);
+	if (IS_ERR(fp)) {
+		/* Enable PowerSave Mode */
+		dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode, sizeof(uint), TRUE, 0);
+
+		fp = filp_open(filepath, O_RDWR | O_CREAT, 0666);
+		if (IS_ERR(fp) || (fp==NULL)) {
+			DHD_ERROR(("[%s, %d] /data/.psm.info open failed\n", __FUNCTION__, __LINE__));
+			return;
+		}
+		else {
+			oldfs = get_fs();
+			set_fs(get_ds());
+
+			if (fp->f_mode & FMODE_WRITE) {
+				power_val = '1';
+				fp->f_op->write(fp, (const char *)&power_val, sizeof(char), &fp->f_pos);
+			}
+			set_fs(oldfs);
+		}
+	}
+	else {
+		kernel_read(fp, fp->f_pos, &power_val, 1);
+		DHD_ERROR(("POWER_VAL = %c \r\n" , power_val));
+
+		if(power_val == '0') {
+#ifdef ROAM_ENABLE
+			uint roamvar = 1;
+#endif
+			*power_mode = PM_OFF;	
+			/* Disable PowerSave Mode */
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode, sizeof(uint), TRUE, 0);
+			/* Turn off MPC in AP mode */
+			bcm_mkiovar("mpc", (char *)power_mode, 4, iovbuf, sizeof(iovbuf));
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+			g_PMcontrol = TRUE;
+#ifdef ROAM_ENABLE
+			bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, sizeof(iovbuf));
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+#endif
+		} else {
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode, sizeof(uint), TRUE, 0);
+		}
+	}
+
+	if(fp)
+		filp_close(fp, NULL);
 }
 #endif

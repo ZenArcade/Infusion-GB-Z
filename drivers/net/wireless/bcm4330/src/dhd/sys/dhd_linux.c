@@ -28,6 +28,7 @@
 #ifdef CONFIG_WIFI_CONTROL_FUNC
 #include <linux/platform_device.h>
 #endif
+
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>
@@ -54,6 +55,7 @@
 #include <proto/ethernet.h>
 #include <dngl_stats.h>
 #include <dhd.h>
+#include <dhd_bus.h>
 #include <dhd_proto.h>
 #include <dhd_dbg.h>
 #ifdef CONFIG_HAS_WAKELOCK
@@ -214,16 +216,6 @@ void wifi_del_dev(void)
 }
 #endif /* defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC) */
 
-#if defined(DHD_USE_STATIC_BUF) && defined(SAMSUNG_STATIC_BUF)
-
-#define DHD_PREALLOC_PROT_SIZE  	(12*1024)
-#define DHD_PREALLOC_RXBUF_SIZE		(12*1024)
-#define DHD_PREALLOC_DATABUF_SIZE	(32*1024)
-#define DHD_PREALLOC_OSL_BUF_SIZE	(16*1024)
-static int32 nStatic_allocated = 0;
-static void __iomem *static_ptr = NULL;
-
-#endif /* defined(DHD_USE_STATIC_BUF) && defined(SAMSUNG_STATIC_BUF) */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 #include <linux/suspend.h>
@@ -237,8 +229,6 @@ extern void dhd_enable_oob_intr(struct dhd_bus *bus, bool enable);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
 MODULE_LICENSE("GPL v2");
 #endif /* LinuxVer */
-
-#include <dhd_bus.h>
 
 #define DBUS_RX_BUFFER_SIZE_DHD(net)	(net->mtu + net->hard_header_len + dhd->pub.hdrlen)
 
@@ -606,7 +596,7 @@ extern int register_pm_notifier(struct notifier_block *nb);
 extern int unregister_pm_notifier(struct notifier_block *nb);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP) */
 	/* && defined(DHD_GPL) */
-static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
+void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 {
 #ifdef PKT_FILTER_SUPPORT
 	DHD_TRACE(("%s: %d\n", __FUNCTION__, value));
@@ -637,9 +627,10 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 #ifndef CUSTOMER_HW_SAMSUNG
 	int power_mode = PM_MAX;
 #endif
-	/* wl_pkt_filter_enable_t	enable_parm; */
+#ifndef DTIM_CNT1    // for DTIM 1
 	char iovbuf[32];
 	int bcn_li_dtim = 3;
+#endif
 #ifdef CONFIG_MACH_MAHIMAHI
 	uint roamvar = 1;
 #endif /* CONFIG_MACH_MAHIMAHI */
@@ -658,7 +649,7 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				/* Enable packet filter, only allow unicast packet to send up */
 				if (!ap_fw_loaded)
 					dhd_set_packet_filter(1, dhd);
-
+#ifndef DTIM_CNT1    // for DTIM 1
 				/* If DTIM skip is set up as default, force it to wake
 				 * each third DTIM for better power savings.  Note that
 				 * one side effect is a chance to miss BC/MC packet.
@@ -670,6 +661,7 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
 					4, iovbuf, sizeof(iovbuf));
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf), 1);
+#endif
 #ifdef CONFIG_MACH_MAHIMAHI
 				/* Disable built-in roaming to allow
 				 * supplicant to take care of it.
@@ -678,8 +670,10 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 					iovbuf, sizeof(iovbuf));
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf), 1);
 #endif /* CONFIG_MACH_MAHIMAHI */
+				dhd->early_suspended = 1;
 			} else {
-
+				dhd->early_suspended = 0;
+				
 				/* Kernel resumed  */
 				DHD_TRACE(("%s: Remove extra suspend setting \n", __FUNCTION__));
 #ifndef CUSTOMER_HW_SAMSUNG
@@ -691,9 +685,11 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 					dhd_set_packet_filter(0, dhd);
 
 				/* restore pre-suspend setting for dtim_skip */
+#ifndef DTIM_CNT1       //for DTIM 1
 				bcm_mkiovar("bcn_li_dtim", (char *)&dhd->dtim_skip,
 					4, iovbuf, sizeof(iovbuf));
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf), 1);
+#endif
 #ifdef CONFIG_MACH_MAHIMAHI
 				roamvar = dhd_roam_disable;
 				bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf,
@@ -1364,6 +1360,35 @@ dhd_txflowcontrol(dhd_pub_t *dhdp, int ifidx, bool state)
 		netif_wake_queue(net);
 }
 
+#ifdef DHD_RX_DUMP
+typedef struct {
+	uint16 type;
+	const char *str;
+} PKTTYPE_INFO;
+
+static const PKTTYPE_INFO packet_type_info[] =
+{
+	{ ETHER_TYPE_IP, "IP" },
+	{ ETHER_TYPE_ARP, "ARP" },
+	{ ETHER_TYPE_BRCM, "BRCM" },
+	{ ETHER_TYPE_802_1X, "802.1X" },
+	{ ETHER_TYPE_WAI, "WAPI" },
+	{ 0, ""}
+};
+
+static const char *_get_packet_type_str(uint16 type)
+{
+	int i;
+	int n = sizeof(packet_type_info)/sizeof(packet_type_info[1]) - 1;
+	for (i=0; i<n; i++) {
+		if (packet_type_info[i].type == type)
+			return packet_type_info[i].str;
+	}
+
+	return packet_type_info[n].str;
+}
+#endif
+
 void
 dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 {
@@ -1974,6 +1999,7 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 	uint driver = 0;
 	int ifidx;
 	int ret;
+	static int hang_retry = 0;
 
 	DHD_OS_WAKE_LOCK(&dhd->pub);
 
@@ -2138,11 +2164,16 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 done:
 	if ((bcmerror == -ETIMEDOUT) || ((dhd->pub.busstate == DHD_BUS_DOWN) &&
 		(!dhd->pub.dongle_reset))) {
-		DHD_ERROR(("%s: Event HANG send up\n", __FUNCTION__));
-		net_os_send_hang_message(net);
+
+		if (++hang_retry > 3) {
+			DHD_ERROR(("%s: Event HANG send up\n", __FUNCTION__));
+			net_os_send_hang_message(net);
+			hang_retry = 0;
+		}
 	}
 
 	if (!bcmerror && buf && ioc.buf) {
+		hang_retry = 0;
 		if (copy_to_user(ioc.buf, buf, buflen))
 			bcmerror = -EFAULT;
 	}
@@ -2558,6 +2589,9 @@ extern int dhd_read_macaddr(struct dhd_info *dhd, struct ether_addr *mac);
 extern int CheckRDWR_Macaddr(dhd_info_t *dhd, dhd_pub_t *dhdp, struct ether_addr *mac);
 extern int WriteRDWR_Macaddr(struct ether_addr *mac);
 #endif
+#ifdef WRITE_MACADDR
+extern int Write_Macaddr(struct ether_addr *mac);
+#endif
 
 #ifdef USE_CID_CHECK
 extern int check_module_cid(dhd_pub_t *dhd);
@@ -2676,6 +2710,8 @@ dhd_bus_start(dhd_pub_t *dhdp)
 
 #ifdef RDWR_MACADDR
 	WriteRDWR_Macaddr(&dhd->pub.mac);
+#elif defined(WRITE_MACADDR)
+	Write_Macaddr(&dhd->pub.mac);
 #endif
 
 	return 0;
@@ -3047,6 +3083,7 @@ dhd_module_cleanup(void)
 #if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
 	wifi_del_dev();
 #endif
+
 	/* Call customer gpio to turn off power with WL_REG_ON signal */
 	dhd_customer_gpio_wlan_ctrl(WLAN_POWER_OFF);
 }
@@ -3075,8 +3112,6 @@ dhd_module_init(void)
 	} while (0);
 #endif /* DHDTHREAD */
 
-	/* Call customer gpio to turn on power with WL_REG_ON signal */
-	dhd_customer_gpio_wlan_ctrl(WLAN_POWER_ON);
 
 #if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
 	sema_init(&wifi_control_sem, 0);
@@ -3094,6 +3129,10 @@ dhd_module_init(void)
 		wifi_del_dev();
 		goto fail_1;
 	}
+	
+#else
+	/* Call customer gpio to turn on power with WL_REG_ON signal */
+	dhd_customer_gpio_wlan_ctrl(WLAN_POWER_ON);
 #endif /* #if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC) */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
@@ -3105,9 +3144,6 @@ dhd_module_init(void)
 		printf("\n%s\n", dhd_version);
 	else {
 		DHD_ERROR(("%s: sdio_register_driver failed\n", __FUNCTION__));
-#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
-		wifi_del_dev();
-#endif
 		goto fail_1;
 	}
 
@@ -3121,9 +3157,6 @@ dhd_module_init(void)
 		error = -EINVAL;
 		DHD_ERROR(("%s: sdio_register_driver timeout\n", __FUNCTION__));
 		goto fail_2;
-#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
-		wifi_del_dev();
-#endif
 		}
 #endif
 
@@ -3869,7 +3902,7 @@ int dhd_os_wake_lock_timeout(dhd_pub_t *pub)
 		ret = dhd->wakelock_timeout_enable;
 #ifdef CONFIG_HAS_WAKELOCK
 		if (dhd->wakelock_timeout_enable)
-			wake_lock_timeout(&dhd->wl_rxwake, HZ);
+			wake_lock_timeout(&dhd->wl_rxwake, 6*HZ/10);
 #endif
 		dhd->wakelock_timeout_enable = 0;
 		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);

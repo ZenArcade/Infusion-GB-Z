@@ -912,6 +912,9 @@ wl_show_host_event(wl_event_msg_t *event, void *event_data)
 #ifdef WLBTAMP
 	case WLC_E_BTA_HCI_EVENT:
 		DHD_EVENT(("MACEVENT: %s %d\n", event_name, ntoh32(*((int *)event_data))));
+#ifdef DHD_BTAMP_DBG
+		dhd_bta_hcidump_evt(NULL, event_data);
+#endif
 		break;
 #endif
 
@@ -1026,80 +1029,6 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 		memcpy((void *)(&pvt_data->event.event_type), &temp,
 		       sizeof(pvt_data->event.event_type));	}
 		/* These are what external supplicant/authenticator wants */
-#if defined(BCMCCX) && defined(BCMDBG_EVENT)
-	case WLC_E_PRUNE: {
-#define WLC_E_PRUNE_CCXFAST_PREVAP	11	/* CCX FAST ROAM: prune previous AP */
-#define WLC_E_PRUNE_CCXFAST_DROAM	14	/* CCX FAST ROAM: prune unqualified AP */
-#define WLC_E_PRUNE_QBSS_LOAD		16	/* QBSS LOAD - AAC is too low */
-#define WLC_E_PRUNE_AP_BLOCKED		18	/* prune blocked AP */
-#define WLC_E_PRUNE_NO_DIAG_SUPPORT	19	/* prune due to diagnostic mode not supported */
-		uint reason;
-		char eabuf[ETHER_ADDR_STR_LEN];
-		reason = ntoh32_ua((void *)&event->reason);
-		sprintf(eabuf, "%02x:%02x:%02x:%02x:%02x:%02x",
-		        (uchar)event->addr.octet[0]&0xff,
-		        (uchar)event->addr.octet[1]&0xff,
-		        (uchar)event->addr.octet[2]&0xff,
-		        (uchar)event->addr.octet[3]&0xff,
-		        (uchar)event->addr.octet[4]&0xff,
-		        (uchar)event->addr.octet[5]&0xff);
-
-		switch(reason) {
-			case WLC_E_PRUNE_CCXFAST_PREVAP:
-				DHD_ERROR(("PRUNE %s: PRUNE: WLC_E_PRUNE_CCXFAST_PREVAP\n", eabuf));
-				break;
-			case WLC_E_PRUNE_CCXFAST_DROAM:
-				DHD_ERROR(("PRUNE %s: PRUNE: WLC_E_PRUNE_CCXFAST_DROAM\n", eabuf));
-				break;
-			case WLC_E_PRUNE_QBSS_LOAD:
-				DHD_ERROR(("PRUNE %s: PRUNE: WLC_E_PRUNE_QBSS_LOAD\n", eabuf));
-				break;
-			case WLC_E_PRUNE_AP_BLOCKED:
-				DHD_ERROR(("PRUNE %s: PRUNE: WLC_E_PRUNE_AP_BLOCKED\n", eabuf));
-				break;
-			case WLC_E_PRUNE_NO_DIAG_SUPPORT:
-				DHD_ERROR(("PRUNE %s: PRUNE: WLC_E_PRUNE_NO_DIAG_SUPPORT\n", eabuf));
-				break;
-			default:
-				DHD_ERROR(("PRUNE %s: status %d, reason %d\n",
-				           eabuf, status, reason));
-				break;
-		}
-		break;
-	}
-	case WLC_E_ADDTS_IND: {
-		uint reason;
-		char eabuf[ETHER_ADDR_STR_LEN];
-		reason = ntoh32_ua((void *)&event->reason);
-		sprintf(eabuf, "%02x:%02x:%02x:%02x:%02x:%02x",
-		        (uchar)event->addr.octet[0]&0xff,
-		        (uchar)event->addr.octet[1]&0xff,
-		        (uchar)event->addr.octet[2]&0xff,
-		        (uchar)event->addr.octet[3]&0xff,
-		        (uchar)event->addr.octet[4]&0xff,
-		        (uchar)event->addr.octet[5]&0xff);
-		DHD_ERROR(("Junlim WLC_E_ADDTS_IND %s: status %d, reason %d\n",
-		           eabuf, status, reason));
-	}
-	break;
-	case WLC_E_DELTS_IND: {
-		uint reason;
-		char eabuf[ETHER_ADDR_STR_LEN];
-		reason = ntoh32_ua((void *)&event->reason);
-		sprintf(eabuf, "%02x:%02x:%02x:%02x:%02x:%02x",
-		        (uchar)event->addr.octet[0]&0xff,
-		        (uchar)event->addr.octet[1]&0xff,
-		        (uchar)event->addr.octet[2]&0xff,
-		        (uchar)event->addr.octet[3]&0xff,
-		        (uchar)event->addr.octet[4]&0xff,
-		        (uchar)event->addr.octet[5]&0xff);
-		DHD_ERROR(("Junlim WLC_E_DELTS_IND %s: status %d, reason %d\n",
-		           eabuf, status, reason));
-	}
-	break;
-#endif /* defined(BCMCCX) && defined(BCMDBG_EVENT) */
-
-
 		/* fall through */
 		case WLC_E_LINK:
 		case WLC_E_DEAUTH:

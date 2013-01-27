@@ -2,7 +2,7 @@
  * BT-AMP (BlueTooth Alternate Mac and Phy) HCI (Host/Controller Interface)
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * 
+ *
  *         Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -22,7 +22,7 @@
  * other than the GPL, without Broadcom's express prior written consent.
  *
  * $Id: bt_amp_hci.h,v 9.4.4.2.32.5 2009/10/16 21:24:36 Exp $
-*/
+ */
 
 #ifndef _bt_amp_hci_h
 #define _bt_amp_hci_h
@@ -197,6 +197,7 @@ typedef BWL_PRE_PACKED_STRUCT struct amp_hci_event {
 #define HCI_Flow_Spec_Modify_Complete		0x47
 #define HCI_Number_of_Completed_Data_Blocks	0x48
 #define HCI_Short_Range_Mode_Change_Complete	0x4C
+#define HCI_Status_Change_Event			0x4D
 #define HCI_Vendor_Specific			0xFF
 
 /* AMP HCI event mask bit positions */
@@ -208,6 +209,8 @@ typedef BWL_PRE_PACKED_STRUCT struct amp_hci_event {
 #define HCI_Flow_Spec_Modify_Complete_Event_Mask		0x0080
 #define HCI_Number_of_Completed_Data_Blocks_Event_Mask		0x0100
 #define HCI_Short_Range_Mode_Change_Complete_Event_Mask		0x1000
+#define HCI_Status_Change_Event_Mask				0x2000
+#define HCI_All_Event_Mask					0x31e7
 
 /* AMP HCI event parameters */
 typedef BWL_PRE_PACKED_STRUCT struct cmd_status_parms {
@@ -376,6 +379,10 @@ typedef BWL_PRE_PACKED_STRUCT struct local_supported_cmd_evt_parms {
 	uint8 cmd[MAX_SUPPORTED_CMD_BYTE];
 } BWL_POST_PACKED_STRUCT local_supported_cmd_evt_parms_t;
 
+typedef BWL_PRE_PACKED_STRUCT struct status_change_evt_parms {
+	uint8 status;
+	uint8 amp_status;
+} BWL_POST_PACKED_STRUCT status_change_evt_parms_t;
 
 /* AMP HCI error codes */
 #define HCI_SUCCESS				0x00

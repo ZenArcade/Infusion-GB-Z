@@ -1,5 +1,5 @@
 #!/bin/sh
-export KBUILD_BUILD_VERSION="Synthesis-Z-A16"
+export KBUILD_BUILD_VERSION="Synthesis-A16"
 cp -rf ./Core-A/* ./
 mkdir -p kernel/usr/initramfs
 rm -rf kernel/usr/initramfs/*
