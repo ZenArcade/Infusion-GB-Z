@@ -1,5 +1,5 @@
 #!/bin/sh
-export KBUILD_BUILD_VERSION="Synthesis-B14"
+export KBUILD_BUILD_VERSION="Synthesis-1.4Ghz-rev4"
 cp -rf ./Core-B/* ./
 mkdir -p kernel/usr/initramfs
 rm -rf kernel/usr/initramfs/*

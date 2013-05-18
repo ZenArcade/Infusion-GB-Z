@@ -38,6 +38,9 @@
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#ifdef ARP_OFFLOAD_SUPPORT
+#include <linux/inetdevice.h>
+#endif
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/spinlock.h>
@@ -216,6 +219,15 @@ void wifi_del_dev(void)
 }
 #endif /* defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC) */
 
+#ifdef ARP_OFFLOAD_SUPPORT
+static int dhd_device_event(struct notifier_block *this,
+	unsigned long event,
+	void *ptr);
+
+static struct notifier_block dhd_notifier = {
+	.notifier_call = dhd_device_event
+};
+#endif /* ARP_OFFLOAD_SUPPORT */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 #include <linux/suspend.h>
@@ -412,7 +424,13 @@ uint dhd_pkt_filter_init = 0;
 module_param(dhd_pkt_filter_init, uint, 0);
 
 /* Pkt filter mode control */
+#ifndef WHITELIST_PKT_FILTER
 uint dhd_master_mode = FALSE;
+#else
+char pkt_filter_cmd1[64];
+char pkt_filter_cmd2[64];
+uint dhd_master_mode = TRUE;
+#endif
 module_param(dhd_master_mode, uint, 1);
 
 #ifdef DHDTHREAD
@@ -1592,6 +1610,8 @@ dhd_txcomplete(dhd_pub_t *dhdp, void *txp, bool success)
 		if (bcmp(lsh, BT_SIG_SNAP_MPROT, DOT11_LLC_SNAP_HDR_LEN - 2) == 0 &&
 		    ntoh16(lsh->type) == BTA_PROT_L2CAP) {
 			dhd_bta_tx_hcidata_complete(dhdp, txp, success);
+                        /* show vars 
+                        printf("%s: type=%d len=%d \n", __FUNCTION__, type, len);  */
 		}
 	}
 #endif /* WLBTAMP */
@@ -2564,6 +2584,11 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	register_early_suspend(&dhd->early_suspend);
 	dhd_state |= DHD_ATTACH_STATE_EARLYSUSPEND_DONE;
 #endif
+
+#ifdef ARP_OFFLOAD_SUPPORT
+	register_inetaddr_notifier(&dhd_notifier);
+#endif /* ARP_OFFLOAD_SUPPORT */
+
 	dhd_state |= DHD_ATTACH_STATE_DONE;
 	dhd->dhd_state = dhd_state;
 	return &dhd->pub;
@@ -2605,6 +2630,10 @@ dhd_bus_start(dhd_pub_t *dhdp)
 #ifdef EMBEDDED_PLATFORM
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 #endif /* EMBEDDED_PLATFORM */
+
+#ifdef WHITELIST_PKT_FILTER
+	uint8 pf_offset=0;
+#endif
 
 	ASSERT(dhd);
 
@@ -2690,9 +2719,11 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	setbit(dhdp->eventmask, WLC_E_ROAM);
 #endif /* EMBEDDED_PLATFORM */
 
+#ifndef WHITELIST_PKT_FILTER
 	dhdp->pktfilter_count = 1;
 	/* Setup filter to deny broadcast packets */
 	dhdp->pktfilter[0] = "100 0 0 0 0xffffff 0xffffff";
+#endif
 
 #ifdef USE_CID_CHECK
     check_module_cid(dhdp);
@@ -2714,6 +2745,28 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	Write_Macaddr(&dhd->pub.mac);
 #endif
 
+#ifdef WHITELIST_PKT_FILTER
+		bzero(pkt_filter_cmd1, 64);
+		bzero(pkt_filter_cmd2, 64);
+
+		strcpy(pkt_filter_cmd1, "100 0 0 0 0xffffffffffff ");
+		pf_offset=strlen(pkt_filter_cmd1);
+		sprintf(&pkt_filter_cmd1[pf_offset], "0x%02x%02x%02x%02x%02x%02x"
+			, dhdp->mac.octet[0], dhdp->mac.octet[1], dhdp->mac.octet[2], dhdp->mac.octet[3], dhdp->mac.octet[4], dhdp->mac.octet[5]);
+
+		strcpy(pkt_filter_cmd2, "101 0 0 0 0xffffffffffff ");
+		pf_offset=strlen(pkt_filter_cmd2);
+		sprintf(&pkt_filter_cmd2[pf_offset], "0x%02x%02x%02x%02x%02x%02x"
+			, dhdp->mac.octet[0]|0x02, dhdp->mac.octet[1], dhdp->mac.octet[2], dhdp->mac.octet[3], dhdp->mac.octet[4]^0x80, dhdp->mac.octet[5]);
+
+		dhdp->pktfilter_count = 5;
+		/* Setup filter to pass the following packets */
+		dhdp->pktfilter[0] = pkt_filter_cmd1;				//eth0 unicast packets
+		dhdp->pktfilter[1] = pkt_filter_cmd2;				//p2p0.1 unicast packets
+		dhdp->pktfilter[2] = "104 0 0 12 0xffff 0x0806";	//arp packets
+		dhdp->pktfilter[3] = "106 0 0 0 0xffffff 0x01005e";	//ipv4 multicast packets
+		dhdp->pktfilter[4] = "108 0 0 0 0xffff 0x3333";	//ipv6 multicast packets
+#endif
 	return 0;
 }
 
@@ -2785,6 +2838,52 @@ int dhd_change_mtu(dhd_pub_t *dhdp, int new_mtu, int ifidx)
 	dev->mtu = new_mtu;
 	return 0;
 }
+
+#ifdef ARP_OFFLOAD_SUPPORT
+static int dhd_device_event(struct notifier_block *this,
+	unsigned long event,
+	void *ptr)
+{
+	struct in_ifaddr *ifa = (struct in_ifaddr *)ptr;
+
+	dhd_info_t *dhd;
+	dhd_pub_t *dhd_pub;
+
+	if (!ifa)
+		return NOTIFY_DONE;
+
+	dhd = *(dhd_info_t **)netdev_priv(ifa->ifa_dev->dev);
+	dhd_pub = &dhd->pub;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 31))
+	if (ifa->ifa_dev->dev->netdev_ops == &dhd_ops_pri) {
+#else
+	if (ifa->ifa_dev->dev) {
+#endif
+		switch (event) {
+		case NETDEV_UP:
+			DHD_ARPOE(("%s: [%s] Up IP: 0x%x\n",
+				__FUNCTION__, ifa->ifa_label, ifa->ifa_address));
+
+			if (dhd->pub.busstate != DHD_BUS_DATA) {
+				DHD_ERROR(("%s: bus not ready, exit\n", __FUNCTION__));
+				break;
+			}
+
+			dhd_aoe_hostip_clr(dhd_pub);
+			dhd_aoe_arp_clr(dhd_pub);
+			dhd_arp_offload_add_ip(dhd_pub, ifa->ifa_address);
+			break;
+
+		default:
+			DHD_ARPOE(("%s: do noting for [%s] Event: %lu\n",
+				__func__, ifa->ifa_label, event));
+			break;
+		}
+	}
+	return NOTIFY_DONE;
+}
+#endif /* ARP_OFFLOAD_SUPPORT */
 
 int
 dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
@@ -2952,6 +3051,10 @@ dhd_detach(dhd_pub_t *dhdp)
 		 */
 		osl_delay(1000*100);
 	}
+
+#ifdef ARP_OFFLOAD_SUPPORT
+	unregister_inetaddr_notifier(&dhd_notifier);
+#endif /* ARP_OFFLOAD_SUPPORT */
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 	if (dhd->dhd_state & DHD_ATTACH_STATE_EARLYSUSPEND_DONE)	{
@@ -3144,6 +3247,9 @@ dhd_module_init(void)
 		printf("\n%s\n", dhd_version);
 	else {
 		DHD_ERROR(("%s: sdio_register_driver failed\n", __FUNCTION__));
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+		wifi_del_dev();
+#endif
 		goto fail_1;
 	}
 
@@ -3157,6 +3263,9 @@ dhd_module_init(void)
 		error = -EINVAL;
 		DHD_ERROR(("%s: sdio_register_driver timeout\n", __FUNCTION__));
 		goto fail_2;
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+		wifi_del_dev();
+#endif
 		}
 #endif
 
@@ -3591,6 +3700,10 @@ dhd_sendup_event(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data)
 #ifdef WLBTAMP
 		/* Send up locally generated AMP HCI Events */
 		case WLC_E_BTA_HCI_EVENT:
+
+                    /* KILL THIS MESS
+                    goto punt_bta; */
+
 			len = ntoh32(event->datalen);
 			pktlen = sizeof(bcm_event_t) + len + 2;
 			dhd = dhdp->info;
@@ -3670,6 +3783,8 @@ dhd_sendup_event(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data)
 				/* Could not allocate a sk_buf */
 				DHD_ERROR(("%s: unable to alloc sk_buf", __FUNCTION__));
 			}
+/* RESUME
+punt_bta: */
 			break; /* case WLC_E_BTA_HCI_EVENT */
 #endif /* WLBTAMP */
 

@@ -2967,10 +2967,6 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 
 	if (enforce_mutex)
 		dhd_os_sdlock(bus->dhd);
-#if defined(SDIO_ISR_THREAD) || defined(HW_OOB)
-	/* Change our idea of bus state */
-	bus->dhd->busstate = DHD_BUS_DOWN;
-#endif
 
 	BUS_WAKE(bus);
 
@@ -2981,10 +2977,10 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 	W_SDREG(0, &bus->regs->hostintmask, retries);
 	local_hostintmask = bus->hostintmask;
 	bus->hostintmask = 0;
-#if defined(OOB_INTR_ONLY) && !defined(HW_OOB)
+
 	/* Change our idea of bus state */
 	bus->dhd->busstate = DHD_BUS_DOWN;
-#endif
+
 	/* Force clocks on backplane to be sure F2 interrupt propagates */
 	saveclk = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
 	if (!err) {
@@ -5647,23 +5643,6 @@ dhdsdio_release(dhd_bus_t *bus, osl_t *osh)
 	if (bus) {
 		ASSERT(osh);
 
-#if defined(SDIO_ISR_THREAD) || defined(HW_OOB)
-		if (bus->dhd) {
-			dhd_common_deinit(bus->dhd);
-			dongle_isolation = bus->dhd->dongle_isolation;
-			dhd_detach(bus->dhd);
-		}
-
-		/* De-register interrupt handler */
-		bcmsdh_intr_disable(bus->sdh);
-		bcmsdh_intr_dereg(bus->sdh);
-
-		if (bus->dhd) {
-			dhdsdio_release_dongle(bus, osh, dongle_isolation);
-			dhd_free(bus->dhd);
-			bus->dhd = NULL;
-		}
-#else
 		/* De-register interrupt handler */
 		bcmsdh_intr_disable(bus->sdh);
 		bcmsdh_intr_dereg(bus->sdh);
@@ -5676,7 +5655,7 @@ dhdsdio_release(dhd_bus_t *bus, osl_t *osh)
 			dhd_free(bus->dhd);
 			bus->dhd = NULL;
 		}
-#endif
+
 		dhdsdio_release_malloc(bus, osh);
 
 

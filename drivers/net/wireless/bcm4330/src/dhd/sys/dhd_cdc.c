@@ -577,9 +577,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	int arp_ol = 0xf;	int scan_assoc_time = 40;
 	int scan_unassoc_time = 80;	int assoc_retry = 3;
 	char buf[256];
-#ifdef USE_WIFI_DIRECT
+#ifdef AP
 	uint32 apsta = 1; /* Enable APSTA mode */
-	uint32 plcp = 0;
+	uint32 mpc = 0; /* Turn MPC off for AP/APSTA mode */
 #endif
 
 	/* query for 'ver' to get version info from firmware */
@@ -658,12 +658,19 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	bcm_mkiovar("bcn_timeout", (char *)&bcn_timeout, 4, iovbuf, sizeof(iovbuf));
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 
-#ifdef USE_WIFI_DIRECT
+	/* Disable built-in roaming to allowed ext supplicant to take care of roaming */
+	bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+
+#ifdef AP
+	/* Turn off MPC in AP mode */
+	bcm_mkiovar("mpc", (char *)&mpc, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);	
 	/* Enable APSTA mode */
 	bcm_mkiovar("apsta", (char *)&apsta, 4, iovbuf, sizeof(iovbuf));
-	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);	
 #endif
-
+	
 	/* Force STA UP */
 	ret = dhd_wl_ioctl_cmd(dhd, WLC_UP, (char *)&up, sizeof(up), TRUE, 0);
 	if (ret < 0)
@@ -692,7 +699,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	setbit(eventmask, WLC_E_NDIS_LINK);
 	setbit(eventmask, WLC_E_MIC_ERROR);
 	setbit(eventmask, WLC_E_PMKID_CACHE);
-//	setbit(eventmask, WLC_E_TXFAIL);
+	setbit(eventmask, WLC_E_TXFAIL);
 	setbit(eventmask, WLC_E_JOIN_START);
 	setbit(eventmask, WLC_E_SCAN_COMPLETE);
 #ifdef CIQ_SUPPORT
@@ -730,10 +737,6 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		/* For MFG mode */
 		ret = 0;
 	}
-#endif
-
-#ifdef USE_WIFI_DIRECT
-	dhd_wl_ioctl_cmd(dhd, WLC_SET_PLCPHDR, &plcp, 4, TRUE, 0);
 #endif
 
 done:
